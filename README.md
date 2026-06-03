@@ -15,7 +15,7 @@ Obsidian already shows native browser-style tooltips for real `<a href>` element
 
 ## Settings
 
-The plugin defaults to status bar mode. Long status bar URLs are left-truncated to roughly 60 characters with a leading ellipsis.
+The plugin defaults to status bar mode. Long status bar URLs are left-truncated with a leading ellipsis. The default status bar length is 120 characters and can be changed in settings.
 
 Enable **Show floating tooltip** in the plugin settings to use the dark tooltip pill instead.
 

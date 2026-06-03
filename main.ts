@@ -5,15 +5,18 @@ import { EditorView, ViewPlugin, ViewUpdate } from "@codemirror/view";
 interface LinkTooltipSettings {
 	showTooltip: boolean;
 	debugLogging: boolean;
+	statusBarMaxLength: number;
 }
 
 const DEFAULT_SETTINGS: LinkTooltipSettings = {
 	showTooltip: false,
 	debugLogging: false,
+	statusBarMaxLength: 120,
 };
 
 const LINK_SELECTOR = ".cm-link, .cm-url.external-link, .external-link";
-const MAX_STATUS_URL_LENGTH = 60;
+const MIN_STATUS_URL_LENGTH = 40;
+const MAX_STATUS_URL_LENGTH = 240;
 
 export default class LinkTooltipPlugin extends Plugin {
 	settings: LinkTooltipSettings = { ...DEFAULT_SETTINGS };
@@ -39,6 +42,9 @@ export default class LinkTooltipPlugin extends Plugin {
 
 	async loadSettings(): Promise<void> {
 		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+		this.settings.statusBarMaxLength = normalizeStatusLength(
+			this.settings.statusBarMaxLength,
+		);
 	}
 
 	async saveSettings(): Promise<void> {
@@ -74,7 +80,7 @@ export default class LinkTooltipPlugin extends Plugin {
 			return;
 		}
 
-		this.statusBarItem.setText(truncateLeft(url, MAX_STATUS_URL_LENGTH));
+		this.statusBarItem.setText(truncateLeft(url, this.settings.statusBarMaxLength));
 		this.statusBarItem.setAttr("title", url);
 		this.statusBarItem.style.display = "";
 	}
@@ -152,6 +158,29 @@ class LinkTooltipSettingTab extends PluginSettingTab {
 						this.plugin.clearDisplay();
 						await this.plugin.saveSettings();
 					});
+			});
+
+		new Setting(containerEl)
+			.setName("Status bar URL length")
+			.setDesc("Maximum characters to show in status bar mode before left-truncating.")
+			.addText((text) => {
+				text
+					.setPlaceholder(String(DEFAULT_SETTINGS.statusBarMaxLength))
+					.setValue(String(this.plugin.settings.statusBarMaxLength))
+					.onChange(async (value) => {
+						const length = Number.parseInt(value, 10);
+						if (Number.isNaN(length)) {
+							return;
+						}
+
+						this.plugin.settings.statusBarMaxLength =
+							normalizeStatusLength(length);
+						await this.plugin.saveSettings();
+					});
+				text.inputEl.type = "number";
+				text.inputEl.min = String(MIN_STATUS_URL_LENGTH);
+				text.inputEl.max = String(MAX_STATUS_URL_LENGTH);
+				text.inputEl.step = "10";
 			});
 
 		new Setting(containerEl)
@@ -647,4 +676,15 @@ function truncateLeft(text: string, maxLength: number): string {
 	}
 
 	return `…${text.slice(-(maxLength - 1))}`;
+}
+
+function normalizeStatusLength(length: number): number {
+	if (!Number.isFinite(length)) {
+		return DEFAULT_SETTINGS.statusBarMaxLength;
+	}
+
+	return Math.min(
+		MAX_STATUS_URL_LENGTH,
+		Math.max(MIN_STATUS_URL_LENGTH, Math.round(length)),
+	);
 }
