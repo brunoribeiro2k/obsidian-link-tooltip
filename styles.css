@@ -1,0 +1,25 @@
+.link-tooltip-status {
+	font-family: var(--font-monospace);
+	max-width: 60ch;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.link-tooltip-floating {
+	position: fixed;
+	z-index: var(--layer-popover);
+	display: none;
+	max-width: min(720px, calc(100vw - 16px));
+	padding: 4px 8px;
+	border-radius: 6px;
+	background: rgba(20, 20, 20, 0.94);
+	box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+	color: #fff;
+	font-family: var(--font-monospace);
+	font-size: 12px;
+	line-height: 1.4;
+	overflow-wrap: anywhere;
+	pointer-events: none;
+	white-space: normal;
+}
