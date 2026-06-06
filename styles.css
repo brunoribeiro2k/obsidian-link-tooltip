@@ -1,13 +1,3 @@
-.link-tooltip-status {
-	flex: 1 1 auto;
-	font-family: var(--font-monospace);
-	max-width: min(75vw, 140ch);
-	min-width: 0;
-	overflow: hidden;
-	text-overflow: ellipsis;
-	white-space: nowrap;
-}
-
 .link-tooltip-floating {
 	position: fixed;
 	z-index: var(--layer-popover);

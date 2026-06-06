@@ -3,33 +3,22 @@ import { syntaxTree } from "@codemirror/language";
 import { EditorView, ViewPlugin, ViewUpdate } from "@codemirror/view";
 
 interface LinkTooltipSettings {
-	showTooltip: boolean;
 	debugLogging: boolean;
-	statusBarMaxLength: number;
 }
 
 const DEFAULT_SETTINGS: LinkTooltipSettings = {
-	showTooltip: false,
 	debugLogging: false,
-	statusBarMaxLength: 120,
 };
 
 const LINK_SELECTOR = ".cm-link, .cm-url.external-link, .external-link";
-const MIN_STATUS_URL_LENGTH = 40;
-const MAX_STATUS_URL_LENGTH = 240;
 
 export default class LinkTooltipPlugin extends Plugin {
 	settings: LinkTooltipSettings = { ...DEFAULT_SETTINGS };
 
-	private statusBarItem: HTMLElement | null = null;
 	private tooltipEl: HTMLElement | null = null;
 
 	async onload(): Promise<void> {
 		await this.loadSettings();
-
-		this.statusBarItem = this.addStatusBarItem();
-		this.statusBarItem.addClass("link-tooltip-status");
-		this.hideStatusUrl();
 
 		this.addSettingTab(new LinkTooltipSettingTab(this.app, this));
 		this.registerEditorExtension(createLinkTooltipExtension(this));
@@ -42,9 +31,6 @@ export default class LinkTooltipPlugin extends Plugin {
 
 	async loadSettings(): Promise<void> {
 		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
-		this.settings.statusBarMaxLength = normalizeStatusLength(
-			this.settings.statusBarMaxLength,
-		);
 	}
 
 	async saveSettings(): Promise<void> {
@@ -52,18 +38,10 @@ export default class LinkTooltipPlugin extends Plugin {
 	}
 
 	showUrl(url: string, event: MouseEvent): void {
-		if (this.settings.showTooltip) {
-			this.hideStatusUrl();
-			this.showTooltip(url, event);
-			return;
-		}
-
-		this.hideTooltip();
-		this.showStatusUrl(url);
+		this.showTooltip(url, event);
 	}
 
 	clearDisplay(): void {
-		this.hideStatusUrl();
 		this.hideTooltip();
 	}
 
@@ -73,26 +51,6 @@ export default class LinkTooltipPlugin extends Plugin {
 		}
 
 		console.log(`[link-tooltip] ${message}`, ...data);
-	}
-
-	private showStatusUrl(url: string): void {
-		if (!this.statusBarItem) {
-			return;
-		}
-
-		this.statusBarItem.setText(truncateLeft(url, this.settings.statusBarMaxLength));
-		this.statusBarItem.setAttr("title", url);
-		this.statusBarItem.style.display = "";
-	}
-
-	private hideStatusUrl(): void {
-		if (!this.statusBarItem) {
-			return;
-		}
-
-		this.statusBarItem.setText("");
-		this.statusBarItem.removeAttribute("title");
-		this.statusBarItem.style.display = "none";
 	}
 
 	private showTooltip(url: string, event: MouseEvent): void {
@@ -146,42 +104,6 @@ class LinkTooltipSettingTab extends PluginSettingTab {
 	display(): void {
 		const { containerEl } = this;
 		containerEl.empty();
-
-		new Setting(containerEl)
-			.setName("Show floating tooltip")
-			.setDesc("When disabled, hovered external link URLs are shown in the status bar.")
-			.addToggle((toggle) => {
-				toggle
-					.setValue(this.plugin.settings.showTooltip)
-					.onChange(async (value) => {
-						this.plugin.settings.showTooltip = value;
-						this.plugin.clearDisplay();
-						await this.plugin.saveSettings();
-					});
-			});
-
-		new Setting(containerEl)
-			.setName("Status bar URL length")
-			.setDesc("Maximum characters to show in status bar mode before left-truncating.")
-			.addText((text) => {
-				text
-					.setPlaceholder(String(DEFAULT_SETTINGS.statusBarMaxLength))
-					.setValue(String(this.plugin.settings.statusBarMaxLength))
-					.onChange(async (value) => {
-						const length = Number.parseInt(value, 10);
-						if (Number.isNaN(length)) {
-							return;
-						}
-
-						this.plugin.settings.statusBarMaxLength =
-							normalizeStatusLength(length);
-						await this.plugin.saveSettings();
-					});
-				text.inputEl.type = "number";
-				text.inputEl.min = String(MIN_STATUS_URL_LENGTH);
-				text.inputEl.max = String(MAX_STATUS_URL_LENGTH);
-				text.inputEl.step = "10";
-			});
 
 		new Setting(containerEl)
 			.setName("Debug logging")
@@ -668,23 +590,4 @@ function normalizeUrlToken(text: string): string {
 
 function isExternalUrl(url: string): boolean {
 	return /^(?:(?:https?|ftp|ftps|file):\/\/|mailto:[^\s]+|[a-z][a-z\d+.-]*:[^\s]+|\/\/|www\.)/i.test(url);
-}
-
-function truncateLeft(text: string, maxLength: number): string {
-	if (text.length <= maxLength) {
-		return text;
-	}
-
-	return `…${text.slice(-(maxLength - 1))}`;
-}
-
-function normalizeStatusLength(length: number): number {
-	if (!Number.isFinite(length)) {
-		return DEFAULT_SETTINGS.statusBarMaxLength;
-	}
-
-	return Math.min(
-		MAX_STATUS_URL_LENGTH,
-		Math.max(MIN_STATUS_URL_LENGTH, Math.round(length)),
-	);
 }
