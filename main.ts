@@ -60,7 +60,7 @@ export default class LinkTooltipPlugin extends Plugin {
 		const win = doc.defaultView;
 		const tooltip = this.getTooltipEl(doc);
 		tooltip.setText(url);
-		tooltip.style.display = "block";
+		tooltip.toggleClass("is-visible", true);
 
 		const gap = 12;
 		const edgePadding = 8;
@@ -97,8 +97,7 @@ export default class LinkTooltipPlugin extends Plugin {
 	}
 
 	private hideTooltip(): void {
-		this.tooltipEl?.remove();
-		this.tooltipEl = null;
+		this.tooltipEl?.toggleClass("is-visible", false);
 	}
 }
 

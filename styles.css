@@ -1,7 +1,7 @@
 .link-tooltip-floating {
 	position: fixed;
 	z-index: var(--layer-popover);
-	display: none;
+	display: none; /* overridden by .is-visible */
 	max-width: min(720px, calc(100vw - 16px));
 	padding: 4px 8px;
 	border-radius: 6px;
@@ -15,4 +15,8 @@
 	overflow-wrap: anywhere;
 	pointer-events: none;
 	white-space: normal;
+}
+
+.link-tooltip-floating.is-visible {
+	display: block;
 }
