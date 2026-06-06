@@ -6,5 +6,5 @@
 	"description": "Shows hovered external link URLs in Live Preview and source mode.",
 	"author": "Bruno Ribeiro",
 	"authorUrl": "https://github.com/brunoribeiro2k",
-	"isDesktopOnly": false
+	"isDesktopOnly": true
 }
