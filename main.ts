@@ -597,5 +597,7 @@ function normalizeUrlToken(text: string): string {
 }
 
 function isExternalUrl(url: string): boolean {
-	return /^(?:(?:https?|ftp|ftps|file):\/\/|mailto:[^\s]+|[a-z][a-z\d+.-]*:[^\s]+|\/\/|www\.)/i.test(url);
+	// Explicit allowlist — avoids false positives from tokens like "c:\...",
+	// "note:foo", or any other "word:" that matches a permissive scheme pattern.
+	return /^(?:https?:\/\/|ftps?:\/\/|file:\/\/|mailto:[^\s]+|ssh:\/\/|git:\/\/|obsidian:\/\/|\/\/|www\.)/i.test(url);
 }
