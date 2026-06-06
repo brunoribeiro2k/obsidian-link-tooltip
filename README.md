@@ -9,15 +9,12 @@ Obsidian already shows native browser-style tooltips for real `<a href>` element
 - Registers a CodeMirror 6 extension for editor views.
 - Detects hover on rendered external links in Live Preview and source mode.
 - Reads the hovered link destination from the CodeMirror syntax tree and document text, not from hidden DOM spans.
-- Shows the URL in the status bar by default.
-- Optionally shows the full URL in a small floating tooltip near the cursor.
-- Persists the display mode setting with Obsidian's `loadData()` / `saveData()` plugin data APIs.
+- Shows the full URL in a small floating tooltip near the cursor.
+- Persists the debug logging setting with Obsidian's `loadData()` / `saveData()` plugin data APIs.
 
 ## Settings
 
-The plugin defaults to status bar mode. Long status bar URLs are left-truncated with a leading ellipsis. The default status bar length is 120 characters and can be changed in settings.
-
-Enable **Show floating tooltip** in the plugin settings to use the dark tooltip pill instead.
+The plugin has one setting: **Debug logging**. Enable it only while troubleshooting hover detection.
 
 ## Install into a vault
 
