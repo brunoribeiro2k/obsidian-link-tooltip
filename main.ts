@@ -37,8 +37,8 @@ export default class LinkTooltipPlugin extends Plugin {
 		await this.saveData(this.settings);
 	}
 
-	showUrl(url: string, event: MouseEvent): void {
-		this.showTooltip(url, event);
+	showUrl(url: string, event: MouseEvent, view: EditorView): void {
+		this.showTooltip(url, event, view);
 	}
 
 	clearDisplay(): void {
@@ -53,22 +53,28 @@ export default class LinkTooltipPlugin extends Plugin {
 		console.log(`[link-tooltip] ${message}`, ...data);
 	}
 
-	private showTooltip(url: string, event: MouseEvent): void {
-		const tooltip = this.getTooltipEl();
+	private showTooltip(url: string, event: MouseEvent, view: EditorView): void {
+		// The editor can live in a detached pop-out window, so anchor the
+		// tooltip to the view's own document and clamp against its viewport.
+		const doc = view.dom.ownerDocument;
+		const win = doc.defaultView;
+		const tooltip = this.getTooltipEl(doc);
 		tooltip.setText(url);
 		tooltip.style.display = "block";
 
 		const gap = 12;
 		const edgePadding = 8;
 		const rect = tooltip.getBoundingClientRect();
+		const viewportWidth = win?.innerWidth ?? doc.documentElement.clientWidth;
+		const viewportHeight = win?.innerHeight ?? doc.documentElement.clientHeight;
 		let left = event.clientX + gap;
 		let top = event.clientY + gap;
 
-		if (left + rect.width > window.innerWidth - edgePadding) {
-			left = window.innerWidth - rect.width - edgePadding;
+		if (left + rect.width > viewportWidth - edgePadding) {
+			left = viewportWidth - rect.width - edgePadding;
 		}
 
-		if (top + rect.height > window.innerHeight - edgePadding) {
+		if (top + rect.height > viewportHeight - edgePadding) {
 			top = event.clientY - rect.height - gap;
 		}
 
@@ -76,14 +82,17 @@ export default class LinkTooltipPlugin extends Plugin {
 		tooltip.style.top = `${Math.max(edgePadding, top)}px`;
 	}
 
-	private getTooltipEl(): HTMLElement {
-		if (this.tooltipEl) {
+	private getTooltipEl(doc: Document): HTMLElement {
+		// Reuse the element only while it lives in the document we're drawing
+		// into; if the hover moved to another window, rebuild it there.
+		if (this.tooltipEl && this.tooltipEl.ownerDocument === doc) {
 			return this.tooltipEl;
 		}
 
-		this.tooltipEl = document.createElement("div");
+		this.tooltipEl?.remove();
+		this.tooltipEl = doc.createElement("div");
 		this.tooltipEl.addClass("link-tooltip-floating");
-		document.body.appendChild(this.tooltipEl);
+		doc.body.appendChild(this.tooltipEl);
 		return this.tooltipEl;
 	}
 
@@ -152,7 +161,7 @@ function createLinkTooltipExtension(plugin: LinkTooltipPlugin) {
 					return;
 				}
 
-				plugin.showUrl(url, event);
+				plugin.showUrl(url, event, this.view);
 			};
 
 			private readonly onMouseOut = (event: MouseEvent): void => {
