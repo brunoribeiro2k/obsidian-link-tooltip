@@ -22,9 +22,18 @@ Goal: prepare this for submission to the **Obsidian community plugins** list.
   and a floating tooltip element shows it. Also contains the settings tab.
 - `styles.css` — tooltip styling. Must stay theme-aware (see Conventions).
 - `manifest.json` — Obsidian plugin manifest. Keep `version` in sync with
-  `package.json` and (once added) `versions.json`.
+  `package.json` and `versions.json` (the `npm version` flow does this for you).
+- `versions.json` — maps each plugin version to the `minAppVersion` it requires.
+  Written automatically by `version-bump.mjs`.
 - `esbuild.config.mjs` — bundles `main.ts` → `main.js` (CJS, `obsidian` and
   `@codemirror/*` externalized).
+- `version-bump.mjs` — run by `npm version`; writes the new version into
+  `manifest.json` and `versions.json` and stages them.
+- `.npmrc` — sets `tag-version-prefix=""` so `npm version` tags without a `v`
+  prefix, as the community store requires.
+- `.github/workflows/release.yml` — on a pushed tag, builds and creates a draft
+  GitHub release with `main.js` / `manifest.json` / `styles.css` attached. Fails
+  if the tag is not exactly the `manifest.json` version (no `v` prefix).
 - `scripts/deploy.mjs` — local-only: builds and copies `main.js` / `manifest.json`
   / `styles.css` into a vault's plugin folder. Not part of the release flow.
 - `main.js`, `data.json`, `*.map` are gitignored build/runtime artifacts. `main.js`
@@ -37,6 +46,11 @@ Goal: prepare this for submission to the **Obsidian community plugins** list.
 - `npm run deploy -- --vault "/path/to/Vault"` — build + copy into a vault for
   local testing. Also accepts `--plugin-dir`, or `OBSIDIAN_VAULT` /
   `OBSIDIAN_PLUGIN_DIR` env vars.
+- `npm version <patch|minor|major>` — cut a release version: runs
+  `version-bump.mjs` to sync `manifest.json` + `versions.json`, then commits and
+  creates a tag with **no `v` prefix**. Push it with `git push --follow-tags` to
+  trigger `release.yml`, which builds and drafts the GitHub release. Working tree
+  must be clean first.
 
 Always run `npm run build` before considering a change done — it is the only
 typecheck gate (there is no test suite).
