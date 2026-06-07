@@ -1,6 +1,7 @@
 import { App, Notice, Plugin, PluginSettingTab, Setting } from "obsidian";
 import { syntaxTree } from "@codemirror/language";
 import { EditorView, hoverTooltip } from "@codemirror/view";
+import { isExternalUrl } from "./url.mjs";
 
 interface LinkTooltipSettings {
 	debugLogging: boolean;
@@ -477,10 +478,4 @@ function normalizeUrlToken(text: string): string {
 	}
 
 	return url.replace(/\\([\\`*_[\]{}()#+\-.!<>])/g, "$1");
-}
-
-function isExternalUrl(url: string): boolean {
-	// Explicit allowlist — avoids false positives from tokens like "c:\...",
-	// "note:foo", or any other "word:" that matches a permissive scheme pattern.
-	return /^(?:https?:\/\/|ftps?:\/\/|file:\/\/|mailto:[^\s]+|ssh:\/\/|git:\/\/|obsidian:\/\/|\/\/|www\.)/i.test(url);
 }
