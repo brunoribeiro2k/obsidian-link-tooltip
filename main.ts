@@ -22,7 +22,6 @@ export default class LinkTooltipPlugin extends Plugin {
 
 		this.addSettingTab(new LinkTooltipSettingTab(this.app, this));
 		this.registerEditorExtension(createLinkTooltipExtension(this));
-		this.debug("loaded", this.settings);
 	}
 
 	onunload(): void {
@@ -186,9 +185,6 @@ function createLinkTooltipExtension(plugin: LinkTooltipPlugin) {
 				this.view.dom.addEventListener("mousemove", this.onMouseMove);
 				this.view.dom.addEventListener("mouseout", this.onMouseOut);
 				this.view.dom.addEventListener("mouseleave", this.clear);
-				plugin.debug("editor extension attached", {
-					docLength: this.view.state.doc.length,
-				});
 			}
 
 			update(update: ViewUpdate): void {
