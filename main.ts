@@ -1,6 +1,7 @@
 import { App, Notice, Plugin, PluginSettingTab, Setting } from "obsidian";
 import { syntaxTree } from "@codemirror/language";
 import { EditorView, ViewPlugin, ViewUpdate } from "@codemirror/view";
+import { isExternalUrl } from "./url.mjs";
 
 interface LinkTooltipSettings {
 	debugLogging: boolean;
@@ -594,8 +595,4 @@ function normalizeUrlToken(text: string): string {
 	}
 
 	return url.replace(/\\([\\`*_[\]{}()#+\-.!<>])/g, "$1");
-}
-
-function isExternalUrl(url: string): boolean {
-	return /^(?:(?:https?|ftp|ftps|file):\/\/|mailto:[^\s]+|[a-z][a-z\d+.-]*:[^\s]+|\/\/|www\.)/i.test(url);
 }
