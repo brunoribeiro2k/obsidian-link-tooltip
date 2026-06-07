@@ -1,6 +1,6 @@
 import { App, Notice, Plugin, PluginSettingTab, Setting } from "obsidian";
 import { syntaxTree } from "@codemirror/language";
-import { EditorView, ViewPlugin, ViewUpdate } from "@codemirror/view";
+import { EditorView, hoverTooltip } from "@codemirror/view";
 
 interface LinkTooltipSettings {
 	debugLogging: boolean;
@@ -10,22 +10,14 @@ const DEFAULT_SETTINGS: LinkTooltipSettings = {
 	debugLogging: false,
 };
 
-const LINK_SELECTOR = ".cm-link, .cm-url.external-link, .external-link";
-
 export default class LinkTooltipPlugin extends Plugin {
 	settings: LinkTooltipSettings = { ...DEFAULT_SETTINGS };
-
-	private tooltipEl: HTMLElement | null = null;
 
 	async onload(): Promise<void> {
 		await this.loadSettings();
 
 		this.addSettingTab(new LinkTooltipSettingTab(this.app, this));
 		this.registerEditorExtension(createLinkTooltipExtension(this));
-	}
-
-	onunload(): void {
-		this.clearDisplay();
 	}
 
 	async loadSettings(): Promise<void> {
@@ -36,67 +28,12 @@ export default class LinkTooltipPlugin extends Plugin {
 		await this.saveData(this.settings);
 	}
 
-	showUrl(url: string, event: MouseEvent, view: EditorView): void {
-		this.showTooltip(url, event, view);
-	}
-
-	clearDisplay(): void {
-		this.hideTooltip();
-	}
-
 	debug(message: string, ...data: unknown[]): void {
 		if (!this.settings.debugLogging) {
 			return;
 		}
 
 		console.log(`[link-tooltip] ${message}`, ...data);
-	}
-
-	private showTooltip(url: string, event: MouseEvent, view: EditorView): void {
-		// The editor can live in a detached pop-out window, so anchor the
-		// tooltip to the view's own document and clamp against its viewport.
-		const doc = view.dom.ownerDocument;
-		const win = doc.defaultView;
-		const tooltip = this.getTooltipEl(doc);
-		tooltip.setText(url);
-		tooltip.toggleClass("is-visible", true);
-
-		const gap = 12;
-		const edgePadding = 8;
-		const rect = tooltip.getBoundingClientRect();
-		const viewportWidth = win?.innerWidth ?? doc.documentElement.clientWidth;
-		const viewportHeight = win?.innerHeight ?? doc.documentElement.clientHeight;
-		let left = event.clientX + gap;
-		let top = event.clientY + gap;
-
-		if (left + rect.width > viewportWidth - edgePadding) {
-			left = viewportWidth - rect.width - edgePadding;
-		}
-
-		if (top + rect.height > viewportHeight - edgePadding) {
-			top = event.clientY - rect.height - gap;
-		}
-
-		tooltip.style.left = `${Math.max(edgePadding, left)}px`;
-		tooltip.style.top = `${Math.max(edgePadding, top)}px`;
-	}
-
-	private getTooltipEl(doc: Document): HTMLElement {
-		// Reuse the element only while it lives in the document we're drawing
-		// into; if the hover moved to another window, rebuild it there.
-		if (this.tooltipEl && this.tooltipEl.ownerDocument === doc) {
-			return this.tooltipEl;
-		}
-
-		this.tooltipEl?.remove();
-		this.tooltipEl = doc.createElement("div");
-		this.tooltipEl.addClass("link-tooltip-floating");
-		doc.body.appendChild(this.tooltipEl);
-		return this.tooltipEl;
-	}
-
-	private hideTooltip(): void {
-		this.tooltipEl?.toggleClass("is-visible", false);
 	}
 }
 
@@ -131,102 +68,49 @@ class LinkTooltipSettingTab extends PluginSettingTab {
 }
 
 function createLinkTooltipExtension(plugin: LinkTooltipPlugin) {
-	return ViewPlugin.fromClass(
-		class LinkTooltipViewPlugin {
-			private lastDebugKey: string | null = null;
+	// Delegate the whole hover lifecycle — positioning, teardown, pop-out
+	// window placement, hide-on-scroll — to CodeMirror's own tooltip system.
+	return hoverTooltip(
+		(view, pos) => {
+			const link = getExternalLinkAt(view, pos);
 
-			private readonly onMouseMove = (event: MouseEvent): void => {
-				const target = event.target;
-				if (!(target instanceof Element) || !target.closest(LINK_SELECTOR)) {
-					this.clear();
-					return;
-				}
-
-				const pos = this.view.posAtCoords({
-					x: event.clientX,
-					y: event.clientY,
-				});
-
-				if (pos === null) {
-					this.clear();
-					return;
-				}
-
-				const url = getExternalUrlAt(this.view, pos);
-				this.debugHover(target, pos, url);
-				if (!url) {
-					this.clear();
-					return;
-				}
-
-				plugin.showUrl(url, event, this.view);
-			};
-
-			private readonly onMouseOut = (event: MouseEvent): void => {
-				const target = event.target;
-				if (!(target instanceof Element)) {
-					return;
-				}
-
-				const linkEl = target.closest(LINK_SELECTOR);
-				if (!linkEl) {
-					return;
-				}
-
-				const relatedTarget = event.relatedTarget;
-				if (relatedTarget instanceof Node && linkEl.contains(relatedTarget)) {
-					return;
-				}
-
-				this.clear();
-			};
-
-			constructor(private readonly view: EditorView) {
-				this.view.dom.addEventListener("mousemove", this.onMouseMove);
-				this.view.dom.addEventListener("mouseout", this.onMouseOut);
-				this.view.dom.addEventListener("mouseleave", this.clear);
-			}
-
-			update(update: ViewUpdate): void {
-				if (update.docChanged || update.viewportChanged) {
-					this.clear();
-				}
-			}
-
-			destroy(): void {
-				this.view.dom.removeEventListener("mousemove", this.onMouseMove);
-				this.view.dom.removeEventListener("mouseout", this.onMouseOut);
-				this.view.dom.removeEventListener("mouseleave", this.clear);
-				this.clear();
-			}
-
-			private readonly clear = (): void => {
-				plugin.clearDisplay();
-			};
-
-			private debugHover(target: Element, pos: number, url: string | null): void {
-				if (!plugin.settings.debugLogging) {
-					return;
-				}
-
-				const nodePath = getSyntaxNodePath(this.view, pos);
-				const debugKey = `${describeElement(target)}|${nodePath.join(">")}|${url ?? ""}`;
-				if (this.lastDebugKey === debugKey) {
-					return;
-				}
-
-				this.lastDebugKey = debugKey;
+			if (plugin.settings.debugLogging) {
 				plugin.debug("link hover", {
-					target: describeElement(target),
-					nodePath,
-					url,
+					pos,
+					nodePath: getSyntaxNodePath(view, pos),
+					url: link?.url ?? null,
 				});
 			}
+
+			if (!link) {
+				return null;
+			}
+
+			return {
+				pos: link.from,
+				end: link.to,
+				create() {
+					// Build in the view's own document so the element is valid in
+					// a detached pop-out window; CodeMirror appends it into that
+					// window's tooltip layer.
+					const dom = view.dom.ownerDocument.createElement("div");
+					dom.addClass("link-tooltip-content");
+					dom.setText(link.url);
+					return { dom };
+				},
+			};
 		},
+		{ hideOnChange: true },
 	);
 }
 
-function getExternalUrlAt(view: EditorView, pos: number): string | null {
+interface ExternalLink {
+	url: string;
+	from: number;
+	to: number;
+}
+
+function getExternalLinkAt(view: EditorView, pos: number): ExternalLink | null {
 	const tree = syntaxTree(view.state);
 	let node: typeof tree.topNode | null = tree.resolveInner(pos, -1);
 	let linkRange: { from: number; to: number } | null = null;
@@ -237,7 +121,7 @@ function getExternalUrlAt(view: EditorView, pos: number): string | null {
 				view.state.doc.sliceString(node.from, node.to),
 			);
 			if (isExternalUrl(candidate)) {
-				return candidate;
+				return { url: candidate, from: node.from, to: node.to };
 			}
 		}
 
@@ -246,23 +130,23 @@ function getExternalUrlAt(view: EditorView, pos: number): string | null {
 
 			const urlFromNode = getExternalUrlInRange(view, node.from, node.to);
 			if (urlFromNode) {
-				return urlFromNode;
+				return { url: urlFromNode, from: node.from, to: node.to };
 			}
 
-			const urlFromLine = getExternalInlineUrlFromLine(
+			const linkFromLine = getExternalInlineUrlFromLine(
 				view,
 				pos,
 				node.from,
 				node.to,
 			);
-			if (urlFromLine) {
-				return urlFromLine;
+			if (linkFromLine) {
+				return linkFromLine;
 			}
 
 			const nodeText = view.state.doc.sliceString(node.from, node.to);
 			const parsedUrl = extractExternalUrl(nodeText);
 			if (parsedUrl) {
-				return parsedUrl;
+				return { url: parsedUrl, from: node.from, to: node.to };
 			}
 		}
 
@@ -270,7 +154,15 @@ function getExternalUrlAt(view: EditorView, pos: number): string | null {
 	}
 
 	if (linkRange) {
-		return getExternalInlineUrlFromLine(view, pos, linkRange.from, linkRange.to);
+		const linkFromLine = getExternalInlineUrlFromLine(
+			view,
+			pos,
+			linkRange.from,
+			linkRange.to,
+		);
+		if (linkFromLine) {
+			return linkFromLine;
+		}
 	}
 
 	return getExternalInlineUrlFromLine(view, pos, pos, pos);
@@ -281,7 +173,7 @@ function getExternalInlineUrlFromLine(
 	pos: number,
 	linkFrom: number,
 	linkTo: number,
-): string | null {
+): ExternalLink | null {
 	const line = view.state.doc.lineAt(pos);
 	const links = parseInlineLinks(line.text, line.from);
 
@@ -290,7 +182,7 @@ function getExternalInlineUrlFromLine(
 			isInRange(pos, link.fullFrom, link.fullTo) ||
 			rangesOverlap(linkFrom, linkTo, link.labelFrom, link.labelTo)
 		) {
-			return link.destination;
+			return { url: link.destination, from: link.fullFrom, to: link.fullTo };
 		}
 	}
 
@@ -393,11 +285,6 @@ function getSyntaxNodePath(view: EditorView, pos: number): string[] {
 	}
 
 	return path;
-}
-
-function describeElement(element: Element): string {
-	const className = Array.from(element.classList).join(".");
-	return className ? `${element.tagName.toLowerCase()}.${className}` : element.tagName.toLowerCase();
 }
 
 function isPotentialLinkNode(name: string): boolean {
