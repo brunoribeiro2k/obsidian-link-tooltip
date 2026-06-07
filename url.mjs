@@ -24,6 +24,10 @@ const EXTERNAL_URL_PATTERN = new RegExp(
 	"i",
 );
 
+/**
+ * @param {string} url
+ * @returns {boolean}
+ */
 export function isExternalUrl(url) {
 	return EXTERNAL_URL_PATTERN.test(url);
 }
