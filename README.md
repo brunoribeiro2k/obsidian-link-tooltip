@@ -62,4 +62,18 @@ The hover diagnostics include the hovered DOM classes, nearby syntax-tree node p
 
 ## Community plugins
 
-This plugin is intended to be submitted to the Obsidian community plugins list after testing and release preparation.
+Install directly from Obsidian:
+
+1. Open **Settings → Community plugins**.
+2. Make sure Safe mode is off, then click **Browse**.
+3. Search for **Link Tooltip** and click **Install**.
+4. Enable the plugin.
+
+### BRAT (pre-release)
+
+To test a pre-release build with [BRAT](https://github.com/TfTHacker/obsidian42-brat):
+
+1. Install and enable the BRAT plugin.
+2. Run **BRAT: Add a beta plugin for testing**.
+3. Enter `brunoribeiro2k/obsidian-link-tooltip`.
+4. Enable **Link Tooltip** in Community plugins settings.
