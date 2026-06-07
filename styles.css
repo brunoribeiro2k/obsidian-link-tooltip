@@ -1,22 +1,21 @@
-.link-tooltip-floating {
-	position: fixed;
-	z-index: var(--layer-popover);
-	display: none; /* overridden by .is-visible */
-	max-width: min(720px, calc(100vw - 16px));
-	padding: 4px 8px;
-	border-radius: 6px;
+/* CodeMirror wraps our content in .cm-tooltip.cm-tooltip-hover and applies a
+   hardcoded grey bubble from its base theme. Re-skin only our own tooltip
+   (scoped with :has) using Obsidian variables so it stays theme-aware across
+   light/dark/custom themes and matches the rest of the editor UI. */
+.cm-tooltip.cm-tooltip-hover:has(.link-tooltip-content) {
 	border: 1px solid var(--background-modifier-border);
+	border-radius: 6px;
 	background: var(--background-secondary);
 	box-shadow: var(--shadow-s);
+}
+
+.link-tooltip-content {
+	max-width: min(720px, 90vw);
+	padding: 4px 8px;
 	color: var(--text-normal);
 	font-family: var(--font-monospace);
 	font-size: 12px;
 	line-height: 1.4;
 	overflow-wrap: anywhere;
-	pointer-events: none;
 	white-space: normal;
-}
-
-.link-tooltip-floating.is-visible {
-	display: block;
 }
