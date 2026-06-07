@@ -9,7 +9,7 @@
 // Explicit allowlist — avoids false positives from tokens like "c:\...",
 // "note:foo", or any other "word:" that matches a permissive scheme pattern.
 const EXTERNAL_URL_PATTERN =
-	/^(?:https?:\/\/|ftps?:\/\/|file:\/\/|mailto:[^\s]+|ssh:\/\/|git:\/\/|obsidian:\/\/|\/\/|www\.)/i;
+	/^(?:https?:\/\/|ftps?:\/\/|file:\/\/|mailto:[^\s]+|\/\/|www\.)/i;
 
 export function isExternalUrl(url) {
 	return EXTERNAL_URL_PATTERN.test(url);

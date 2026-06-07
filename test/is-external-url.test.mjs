@@ -11,11 +11,6 @@ describe("isExternalUrl", () => {
 			"ftps://files.example.com/archive.zip",
 			"file:///home/user/file.txt",
 			"mailto:user@example.com",
-			"ssh://git@host/repo.git",
-			"git://host/repo.git",
-			// obsidian:// is intentionally external here (a deliberate divergence
-			// from the upstream fork, which rejected it).
-			"obsidian://open?vault=Notes",
 			"//cdn.example.com/app.js",
 			"www.example.com/docs",
 		]) {
@@ -23,7 +18,7 @@ describe("isExternalUrl", () => {
 		}
 	});
 
-	it("rejects custom schemes, Windows paths, and bare tokens", () => {
+	it("rejects non-allowlisted schemes, Windows paths, and bare tokens", () => {
 		for (const url of [
 			"C:\\Users\\User\\notes.md",
 			"c:\\temp\\notes.md",
@@ -31,6 +26,9 @@ describe("isExternalUrl", () => {
 			"tel:+15551234567",
 			"javascript:alert(1)",
 			"custom-scheme:value",
+			"ssh://git@host/repo.git",
+			"git://host/repo.git",
+			"obsidian://open?vault=Notes",
 			"relative/path/note.md",
 			"",
 		]) {
