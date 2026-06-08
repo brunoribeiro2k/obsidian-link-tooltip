@@ -17,9 +17,15 @@ Goal: prepare this for submission to the **Obsidian community plugins** list.
 
 ## Layout
 
-- `main.ts` — the entire plugin. A CodeMirror 6 `ViewPlugin` listens for hover on
-  link spans, resolves the external URL from the syntax tree / inline-link parser,
-  and a floating tooltip element shows it. Also contains the settings tab.
+- `main.ts` — almost the entire plugin. A CodeMirror 6 `ViewPlugin` listens for
+  hover on link spans, resolves the external URL from the syntax tree / inline-link
+  parser, and a floating tooltip element shows it. Also contains the settings tab.
+  Imports `isExternalUrl` from `url.mjs`.
+- `url.mjs` — dependency-free external-URL scheme allowlist (`isExternalUrl`). Kept
+  as a standalone module rather than inlined in `main.ts` so it can be unit-tested
+  with `node --test` without bundling `obsidian` / `@codemirror/*`.
+- `test/is-external-url.test.mjs` — `node --test` cases for `isExternalUrl`:
+  allowed schemes vs. rejected false positives (`c:\…`, `note:`, `tel:`, …).
 - `styles.css` — tooltip styling. Must stay theme-aware (see Conventions).
 - `manifest.json` — Obsidian plugin manifest. Keep `version` in sync with
   `package.json` and `versions.json` (the `npm version` flow does this for you).
@@ -43,6 +49,7 @@ Goal: prepare this for submission to the **Obsidian community plugins** list.
 
 - `npm run dev` — esbuild watch (inline sourcemaps).
 - `npm run build` — typecheck (`tsc -noEmit -skipLibCheck`) then production bundle.
+- `npm test` — run the `isExternalUrl` unit tests via `node --test`.
 - `npm run deploy -- --vault "/path/to/Vault"` — build + copy into a vault for
   local testing. Also accepts `--plugin-dir`, or `OBSIDIAN_VAULT` /
   `OBSIDIAN_PLUGIN_DIR` env vars.
@@ -52,8 +59,8 @@ Goal: prepare this for submission to the **Obsidian community plugins** list.
   trigger `release.yml`, which builds and drafts the GitHub release. Working tree
   must be clean first.
 
-Always run `npm run build` before considering a change done — it is the only
-typecheck gate (there is no test suite).
+Always run `npm run build` before considering a change done — it is the typecheck
+gate. Run `npm test` (`node --test`) for the `isExternalUrl` unit tests.
 
 ## Conventions / hard rules
 
