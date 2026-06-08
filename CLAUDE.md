@@ -4,26 +4,36 @@ Guidance for working in this repository.
 
 ## What this is
 
-**Link Tooltip** is an Obsidian plugin that shows the destination URL of a hovered
-external Markdown link while editing — in **Live Preview** and **source mode**.
+**Link Tooltip** is an Obsidian plugin that shows the destination of a hovered link
+while editing — in **Live Preview** and **source mode**. A tooltip appears for any
+link that hides its destination behind a label: every Markdown link `[label](dest)`
+(external URL or internal note path, shown as its literal target) and aliased
+wikilinks `[[target|alias]]`. Bare links — raw autolinks and unaliased `[[Note]]` —
+already show their destination as text, so they get no tooltip.
 
 Scope decision (intentional): Reading mode is **out of scope**. Obsidian already
 renders real `<a href>` elements with native browser tooltips there. This plugin
 only targets the editor, where CodeMirror renders links as spans with no `href`
-attribute, so the URL must be recovered from the CodeMirror syntax tree and the
-document text.
+attribute, so the destination must be recovered from the document text.
 
 Goal: prepare this for submission to the **Obsidian community plugins** list.
 
 ## Layout
 
-- `main.ts` — almost the entire plugin. A CodeMirror 6 `ViewPlugin` listens for
-  hover on link spans, resolves the external URL from the syntax tree / inline-link
-  parser, and a floating tooltip element shows it. Also contains the settings tab.
+- `main.ts` — the plugin shell. A CodeMirror 6 `hoverTooltip` resolves the hovered
+  link with `parseLinks` from `links.mjs`, gates it by the per-kind settings, and
+  renders the destination in the tooltip. Also contains the settings tab. Does not
+  touch the syntax tree — link detection is purely line-based.
+- `links.mjs` — dependency-free link parser (`parseLinks`, `destinationToShow`).
+  Scans a line for Markdown links and wikilinks and reports each one's range, literal
+  destination, `kind` (external/internal), and whether it is `aliased`. Standalone so
+  it can be unit-tested with `node --test` without bundling `obsidian` / `@codemirror/*`.
   Imports `isExternalUrl` from `url.mjs`.
-- `url.mjs` — dependency-free external-URL scheme allowlist (`isExternalUrl`). Kept
-  as a standalone module rather than inlined in `main.ts` so it can be unit-tested
-  with `node --test` without bundling `obsidian` / `@codemirror/*`.
+- `url.mjs` — dependency-free external-URL scheme allowlist (`isExternalUrl`), used by
+  `links.mjs` to classify a destination as external or internal. Standalone for the
+  same `node --test` reason.
+- `test/links.test.mjs` — `node --test` cases for `parseLinks` / `destinationToShow`:
+  Markdown vs. wikilink, aliased vs. bare, image embeds skipped.
 - `test/is-external-url.test.mjs` — `node --test` cases for `isExternalUrl`:
   allowed schemes vs. rejected false positives (`c:\…`, `note:`, `tel:`, …).
 - `styles.css` — tooltip styling. Must stay theme-aware (see Conventions).
@@ -49,7 +59,7 @@ Goal: prepare this for submission to the **Obsidian community plugins** list.
 
 - `npm run dev` — esbuild watch (inline sourcemaps).
 - `npm run build` — typecheck (`tsc -noEmit -skipLibCheck`) then production bundle.
-- `npm test` — run the `isExternalUrl` unit tests via `node --test`.
+- `npm test` — run the `node --test` unit tests (`parseLinks`, `isExternalUrl`).
 - `npm run deploy -- --vault "/path/to/Vault"` — build + copy into a vault for
   local testing. Also accepts `--plugin-dir`, or `OBSIDIAN_VAULT` /
   `OBSIDIAN_PLUGIN_DIR` env vars.
@@ -60,7 +70,7 @@ Goal: prepare this for submission to the **Obsidian community plugins** list.
   must be clean first.
 
 Always run `npm run build` before considering a change done — it is the typecheck
-gate. Run `npm test` (`node --test`) for the `isExternalUrl` unit tests.
+gate. Run `npm test` (`node --test`) for the `parseLinks` / `isExternalUrl` unit tests.
 
 ## Conventions / hard rules
 

@@ -1,7 +1,7 @@
 {
 	"name": "obsidian-link-tooltip",
 	"version": "0.1.0",
-	"description": "Show hovered external link URLs in Obsidian Live Preview and source mode.",
+	"description": "Show where a hovered link points in Obsidian Live Preview and source mode.",
 	"main": "main.js",
 	"scripts": {
 		"dev": "node esbuild.config.mjs",
