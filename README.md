@@ -1,20 +1,24 @@
 # Link Tooltip
 
-Link Tooltip is a lightweight Obsidian plugin that shows the URL behind a hovered external Markdown link in Live Preview and source mode.
+Link Tooltip is a lightweight Obsidian plugin that shows where a hovered link points, in Live Preview and source mode.
 
-Obsidian already shows native browser-style tooltips for real `<a href>` elements in Reading mode, so Reading mode is intentionally out of scope. This plugin targets the editor, where external links are rendered by CodeMirror as spans and the URL is not available as an `href` attribute.
+A tooltip appears for any link that hides its destination behind a label: every Markdown link `[label](destination)` — an external URL or an internal note path — and aliased wikilinks `[[target|alias]]`. Bare links already show their destination as text (a raw URL, or an unaliased `[[Note]]`), so they get no tooltip.
+
+Obsidian already shows native browser-style tooltips for real `<a href>` elements in Reading mode, so Reading mode is intentionally out of scope. This plugin targets the editor, where links are rendered by CodeMirror as spans and the destination is not available as an `href` attribute.
 
 ## What it does
 
 - Registers a CodeMirror 6 extension for editor views.
-- Detects hover on rendered external links in Live Preview and source mode.
-- Reads the hovered link destination from the CodeMirror syntax tree and document text, not from hidden DOM spans.
-- Shows the full URL in a small floating tooltip near the cursor.
-- Persists the debug logging setting with Obsidian's `loadData()` / `saveData()` plugin data APIs.
+- Detects hover on rendered Markdown links and wikilinks in Live Preview and source mode.
+- Reads the hovered link's destination from the document text (shown as its literal target for internal links), not from hidden DOM spans.
+- Shows the destination in a small floating tooltip near the cursor.
+- Persists its settings with Obsidian's `loadData()` / `saveData()` plugin data APIs.
 
 ## Settings
 
-The plugin has one setting: **Debug logging**. Enable it only while troubleshooting hover detection.
+- **Show tooltips for external links** — reveal the destination URL of a hovered external link. On by default.
+- **Show tooltips for internal links** — reveal the target of a hovered internal link or aliased wikilink. On by default.
+- **Debug logging** — enable only while troubleshooting hover detection.
 
 ## Install into a vault
 
@@ -43,12 +47,12 @@ If the plugin enabled but hover display is not working:
 
 1. Open **Settings -> Community plugins -> Link Tooltip**.
 2. Enable **Debug logging**.
-3. Hover an external Markdown link in Live Preview or source mode.
+3. Hover a Markdown link or aliased wikilink in Live Preview or source mode.
 4. Filter the console for `link-tooltip`.
 
 When debug logging is enabled, Obsidian should show a small notice and the console should show normal `console.log` entries prefixed with `[link-tooltip]`.
 
-The hover diagnostics include the hovered DOM classes, nearby syntax-tree node path, and extracted URL.
+The hover diagnostics include the hovered position and the parsed link (its range, destination, kind, and whether it is aliased).
 
 ## Manual installation
 
