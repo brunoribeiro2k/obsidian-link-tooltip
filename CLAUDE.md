@@ -14,28 +14,35 @@ already show their destination as text, so they get no tooltip.
 Scope decision (intentional): Reading mode is **out of scope**. Obsidian already
 renders real `<a href>` elements with native browser tooltips there. This plugin
 only targets the editor, where CodeMirror renders links as spans with no `href`
-attribute, so the destination must be recovered from the document text.
+attribute, so the destination must be recovered from the CodeMirror syntax tree.
 
 Goal: prepare this for submission to the **Obsidian community plugins** list.
 
 ## Layout
 
-- `main.ts` — the plugin shell. A CodeMirror 6 `hoverTooltip` resolves the hovered
-  link with `parseLinks` from `links.mjs`, gates it by the per-kind settings, and
-  renders the destination in the tooltip. Also contains the settings tab. Does not
-  touch the syntax tree — link detection is purely line-based.
-- `links.mjs` — dependency-free link parser (`parseLinks`, `destinationToShow`).
-  Scans a line for Markdown links and wikilinks and reports each one's range, literal
-  destination, `kind` (external/internal), and whether it is `aliased`. Standalone so
-  it can be unit-tested with `node --test` without bundling `obsidian` / `@codemirror/*`.
-  Imports `isExternalUrl` from `url.mjs`.
+- `main.ts` — the plugin shell, and where link detection lives. A CodeMirror 6
+  `hoverTooltip` reads `syntaxTree(view.state)`, walks the leaf style tokens of the
+  hovered line, and reassembles the single link under the cursor by classifying each
+  token's underscore-joined HyperMD style classes (`link`/`url` for Markdown links,
+  `hmd-internal-link`/`link-alias` for wikilinks, `*code*` for code that must be
+  skipped). It gates the result by the per-kind settings and renders the destination.
+  Also contains the settings tab. Detection is token-driven, not line-based: the
+  tokenizer has already resolved code spans/blocks, escapes, and angle-bracket
+  destinations, so those cases come for free (see #33).
 - `url.mjs` — dependency-free external-URL scheme allowlist (`isExternalUrl`), used by
-  `links.mjs` to classify a destination as external or internal. Standalone for the
-  same `node --test` reason.
-- `test/links.test.mjs` — `node --test` cases for `parseLinks` / `destinationToShow`:
-  Markdown vs. wikilink, aliased vs. bare, image embeds skipped.
+  `main.ts` to classify a Markdown link's destination as external or internal (the
+  tree marks `[[wikilinks]]` as internal but tokenizes `[](note)` and `[](https://…)`
+  identically). Standalone so it can be unit-tested with `node --test` without bundling
+  `obsidian` / `@codemirror/*`.
 - `test/is-external-url.test.mjs` — `node --test` cases for `isExternalUrl`:
   allowed schemes vs. rejected false positives (`c:\…`, `note:`, `tel:`, …).
+- `test/fixtures/vault/` — version-controlled sample notes (Markdown/wikilinks,
+  aliased vs. bare, code spans/blocks, angle-bracket destinations, range edges), each
+  labelled `EXPECT: TOOLTIP` / `EXPECT: NO TOOLTIP`. Token-driven detection needs a
+  live editor and can't run under `node --test`, so these drive manual verification.
+- `scripts/setup-test-vault.mjs` — builds the gitignored `test-vault/` from those
+  fixtures, deploys the current build into it, and enables the plugin, so it opens in
+  Obsidian ready to test. Run with `npm run setup-vault`.
 - `styles.css` — tooltip styling. Must stay theme-aware (see Conventions).
 - `manifest.json` — Obsidian plugin manifest. Keep `version` in sync with
   `package.json` and `versions.json` (the `npm version` flow does this for you).
@@ -59,7 +66,10 @@ Goal: prepare this for submission to the **Obsidian community plugins** list.
 
 - `npm run dev` — esbuild watch (inline sourcemaps).
 - `npm run build` — typecheck (`tsc -noEmit -skipLibCheck`) then production bundle.
-- `npm test` — run the `node --test` unit tests (`parseLinks`, `isExternalUrl`).
+- `npm test` — run the `node --test` unit tests (`isExternalUrl`).
+- `npm run setup-vault` — build, then (re)generate the gitignored `test-vault/` from
+  `test/fixtures/vault/` with the plugin deployed and enabled. Open it as a vault to
+  verify detection (token-driven detection has no `node --test` coverage).
 - `npm run deploy -- --vault "/path/to/Vault"` — build + copy into a vault for
   local testing. Also accepts `--plugin-dir`, or `OBSIDIAN_VAULT` /
   `OBSIDIAN_PLUGIN_DIR` env vars.
@@ -70,7 +80,9 @@ Goal: prepare this for submission to the **Obsidian community plugins** list.
   must be clean first.
 
 Always run `npm run build` before considering a change done — it is the typecheck
-gate. Run `npm test` (`node --test`) for the `parseLinks` / `isExternalUrl` unit tests.
+gate. Run `npm test` (`node --test`) for the `isExternalUrl` unit tests. Because
+detection is token-driven and can't be unit-tested, verify link behaviour changes in
+Obsidian via `npm run setup-vault`.
 
 ## Conventions / hard rules
 

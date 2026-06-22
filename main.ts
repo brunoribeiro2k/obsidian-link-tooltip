@@ -1,6 +1,7 @@
 import { App, Notice, Plugin, PluginSettingTab, Setting } from "obsidian";
 import { EditorView, hoverTooltip } from "@codemirror/view";
-import { destinationToShow, parseLinks } from "./links.mjs";
+import { syntaxTree } from "@codemirror/language";
+import { isExternalUrl } from "./url.mjs";
 
 interface LinkTooltipSettings {
 	externalLinks: boolean;
@@ -110,13 +111,11 @@ function createLinkTooltipExtension(plugin: LinkTooltipPlugin) {
 		(view, pos) => {
 			const link = getLinkTooltipAt(view, pos, plugin.settings);
 
-			if (plugin.settings.debugLogging) {
-				plugin.debug("link hover", { pos, link });
-			}
-
 			if (!link) {
 				return null;
 			}
+
+			plugin.debug("link hover", { pos, link });
 
 			return {
 				pos: link.from,
@@ -136,27 +135,235 @@ function createLinkTooltipExtension(plugin: LinkTooltipPlugin) {
 	);
 }
 
+// Obsidian renders the editor as a flat stream of HyperMD style tokens rather
+// than a structured Link/URL tree (see #33). Detection therefore walks the leaf
+// tokens of the hovered line, classifies them by their underscore-joined style
+// classes, and reassembles the single link under the cursor. The tokenizer has
+// already resolved code spans/blocks, escapes, and angle-bracket destinations,
+// so the gnarly cases the old line parser fought with come for free.
+
+interface LeafToken {
+	name: string;
+	from: number;
+	to: number;
+}
+
+type LinkFamily = "md" | "wiki";
+
+function classesOf(name: string): string[] {
+	return name.split("_");
+}
+
+// Inline code and code blocks both carry a "*code*" class (inline-code,
+// hmd-codeblock, HyperMD-codeblock-bg); nothing link-related contains "code".
+function isCodeToken(name: string): boolean {
+	return /code/i.test(name);
+}
+
+function linkFamily(name: string): LinkFamily | null {
+	if (isCodeToken(name)) {
+		return null;
+	}
+
+	const cls = classesOf(name);
+	if (
+		cls.includes("hmd-internal-link") ||
+		cls.includes("formatting-link-start") ||
+		cls.includes("formatting-link-end")
+	) {
+		return "wiki";
+	}
+	if (cls.includes("url") || cls.includes("link")) {
+		return "md";
+	}
+
+	return null;
+}
+
+// Within a Markdown link, the label/brackets carry "link" and the destination
+// and its parens carry "url".
+function markdownRole(name: string): "label" | "url" | null {
+	const cls = classesOf(name);
+	if (cls.includes("url")) {
+		return "url";
+	}
+	if (cls.includes("link")) {
+		return "label";
+	}
+
+	return null;
+}
+
 function getLinkTooltipAt(
 	view: EditorView,
 	pos: number,
 	settings: LinkTooltipSettings,
 ): LinkTooltipTarget | null {
+	const tree = syntaxTree(view.state);
 	const line = view.state.doc.lineAt(pos);
 
-	for (const link of parseLinks(line.text, line.from)) {
-		if (pos < link.from || pos > link.to) {
-			continue;
-		}
+	const leaves: LeafToken[] = [];
+	tree.iterate({
+		from: line.from,
+		to: line.to,
+		enter(node) {
+			if (!node.node.firstChild) {
+				leaves.push({ name: node.name, from: node.from, to: node.to });
+			}
+		},
+	});
 
-		const url = destinationToShow(link);
-		if (!url) {
-			return null;
-		}
+	// Half-open match: a hover exactly at a link's exclusive end belongs to the
+	// next token, so it shows nothing (#29).
+	const index = leaves.findIndex((token) => pos >= token.from && pos < token.to);
+	if (index === -1) {
+		return null;
+	}
 
-		const enabled =
-			link.kind === "external" ? settings.externalLinks : settings.internalLinks;
-		return enabled ? { url, from: link.from, to: link.to } : null;
+	const family = linkFamily(leaves[index].name);
+	if (family === "md") {
+		return resolveMarkdownLink(view, leaves, index, settings);
+	}
+	if (family === "wiki") {
+		return resolveWikilink(view, leaves, index, settings);
 	}
 
 	return null;
+}
+
+function resolveMarkdownLink(
+	view: EditorView,
+	leaves: LeafToken[],
+	index: number,
+	settings: LinkTooltipSettings,
+): LinkTooltipTarget | null {
+	// Segment the one link around `index`. Adjacent links touch only at a
+	// url -> label transition (a closing `)` followed by the next `[`), so split
+	// the contiguous "md" run there.
+	let start = index;
+	while (
+		start > 0 &&
+		linkFamily(leaves[start - 1].name) === "md" &&
+		!(
+			markdownRole(leaves[start].name) === "label" &&
+			markdownRole(leaves[start - 1].name) === "url"
+		)
+	) {
+		start -= 1;
+	}
+
+	let end = index;
+	while (
+		end < leaves.length - 1 &&
+		linkFamily(leaves[end + 1].name) === "md" &&
+		!(
+			markdownRole(leaves[end].name) === "url" &&
+			markdownRole(leaves[end + 1].name) === "label"
+		)
+	) {
+		end += 1;
+	}
+
+	// The destination is the url *content* token (carries "url" but not the
+	// "formatting" of the parens). A label must be present too, otherwise this is
+	// a bare autolink, which already shows its destination.
+	let destToken: LeafToken | null = null;
+	let hasLabel = false;
+	for (let i = start; i <= end; i += 1) {
+		const cls = classesOf(leaves[i].name);
+		if (cls.includes("url") && !cls.includes("formatting")) {
+			destToken = leaves[i];
+		}
+		if (markdownRole(leaves[i].name) === "label") {
+			hasLabel = true;
+		}
+	}
+	if (!destToken || !hasLabel) {
+		return null;
+	}
+
+	const destination = normalizeDestination(
+		view.state.doc.sliceString(destToken.from, destToken.to),
+	);
+	if (!destination) {
+		return null;
+	}
+
+	const kind = isExternalUrl(destination) ? "external" : "internal";
+	const enabled =
+		kind === "external" ? settings.externalLinks : settings.internalLinks;
+	if (!enabled) {
+		return null;
+	}
+
+	return { url: destination, from: leaves[start].from, to: leaves[end].to };
+}
+
+function resolveWikilink(
+	view: EditorView,
+	leaves: LeafToken[],
+	index: number,
+	settings: LinkTooltipSettings,
+): LinkTooltipTarget | null {
+	let start = index;
+	while (start >= 0 && linkFamily(leaves[start].name) === "wiki") {
+		if (classesOf(leaves[start].name).includes("formatting-link-start")) {
+			break;
+		}
+		start -= 1;
+	}
+	if (
+		start < 0 ||
+		!classesOf(leaves[start].name).includes("formatting-link-start")
+	) {
+		return null;
+	}
+
+	let end = index;
+	while (end < leaves.length && linkFamily(leaves[end].name) === "wiki") {
+		if (classesOf(leaves[end].name).includes("formatting-link-end")) {
+			break;
+		}
+		end += 1;
+	}
+	if (
+		end >= leaves.length ||
+		!classesOf(leaves[end].name).includes("formatting-link-end")
+	) {
+		return null;
+	}
+
+	// Only aliased wikilinks hide their destination; a bare [[Note]] already shows
+	// it. The alias pipe is the marker.
+	let pipe: LeafToken | null = null;
+	for (let i = start; i <= end; i += 1) {
+		if (classesOf(leaves[i].name).includes("link-alias-pipe")) {
+			pipe = leaves[i];
+			break;
+		}
+	}
+	if (!pipe) {
+		return null;
+	}
+
+	if (!settings.internalLinks) {
+		return null;
+	}
+
+	const destination = view.state.doc.sliceString(leaves[start].to, pipe.from).trim();
+	if (!destination) {
+		return null;
+	}
+
+	return { url: destination, from: leaves[start].from, to: leaves[end].to };
+}
+
+function normalizeDestination(text: string): string {
+	let url = text.trim();
+
+	if (url.startsWith("<") && url.endsWith(">")) {
+		url = url.slice(1, -1).trim();
+	}
+
+	return url.replace(/\\([\\`*_[\]{}()#+\-.!<>])/g, "$1");
 }

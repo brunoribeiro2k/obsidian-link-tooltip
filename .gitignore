@@ -2,3 +2,7 @@ node_modules/
 main.js
 *.map
 data.json
+
+# Generated, openable Obsidian vault for visual/manual verification.
+# Source notes live in test/fixtures/vault/; rebuild with `npm run setup-vault`.
+test-vault/
