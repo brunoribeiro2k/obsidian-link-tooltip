@@ -53,8 +53,15 @@ const escaped = version.replace(/[.]/g, "\\.");
 const onReleaseBranch = new RegExp(`^release/${escaped}(-.+)?$`).test(current);
 const branch = onReleaseBranch ? current : `release/${version}`;
 
-if (current !== branch) {
-	run(capture(`git branch --list ${branch}`) ? `git checkout ${branch}` : `git checkout -b ${branch}`);
+if (onReleaseBranch) {
+	console.log(`On release branch "${branch}" for ${version} — keeping it.`);
+} else {
+	const exists = Boolean(capture(`git branch --list ${branch}`));
+	console.log(
+		`Branch "${current}" is not a release branch for ${version}; ` +
+			`${exists ? "switching to existing" : "creating"} "${branch}".`,
+	);
+	run(exists ? `git checkout ${branch}` : `git checkout -b ${branch}`);
 }
 
 // 4. Commit and push.
