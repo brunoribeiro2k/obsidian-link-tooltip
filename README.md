@@ -99,7 +99,7 @@ Work on a feature branch (or directly on a release branch) and open PRs against 
 
 Releases are PR-driven, and tagging plus the GitHub release draft are automated — you only prepare the version bump.
 
-1. From a clean working tree, run `npm run release -- <patch|minor|major>`. This bumps the version (`manifest.json`, `package.json`, `versions.json`) **without** creating a git tag, lands it on a `release/<version>` branch, commits, pushes, and opens a PR to `master`. Pass an optional kebab-case suffix to disambiguate branches — `npm run release -- patch hotfix-tooltip` lands on `release/<version>-hotfix-tooltip`.
+1. From a clean working tree, run `npm run release -- <patch|minor|major>`. This bumps the version (`manifest.json`, `package.json`, `versions.json`) **without** creating a git tag, lands it on a `release/<version>` branch, commits, pushes, and opens a PR to `master`. If you've already created a release branch for this version with a descriptive suffix (e.g. `release/1.0.0-first-final`), run the command from that branch and it's kept as-is rather than switched to the bare `release/<version>`.
 2. Review and merge the PR into `master`.
 3. On that merge, the release workflow detects the new version, builds, attests build provenance, pushes the matching tag (no `v` prefix), and creates a **draft** GitHub release with `main.js`, `manifest.json`, and `styles.css` attached. It links the draft from a comment on the merge commit and from the workflow run summary.
 4. Review the draft's notes and publish it. Publishing makes the assets downloadable; the Obsidian community directory picks up the new version on its next review.

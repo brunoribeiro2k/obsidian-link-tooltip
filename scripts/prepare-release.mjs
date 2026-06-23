@@ -8,11 +8,12 @@
  * git tag (`.npmrc` sets `git-tag-version=false`; the workflow owns tags, and a
  * local tag would collide with the one it pushes).
  *
- *   npm run release -- <patch|minor|major> [branch-description]
+ *   npm run release -- <patch|minor|major>
  *
- * The branch is release/<version>, with an optional kebab-case description
- * suffix (release/<version>-<description>) when several release branches for one
- * version would otherwise clash.
+ * The branch is release/<version>. If you're already on a release branch for the
+ * bumped version — including one you named with a descriptive suffix like
+ * release/<version>-first-final — it's kept rather than switched to the bare
+ * name.
  *
  * Refuses to run on a dirty tree so the release commit contains only the bump,
  * and reuses an existing PR/branch instead of erroring if one is already open.
@@ -23,10 +24,8 @@ import { readFileSync } from "node:fs";
 const BUMP_TYPES = new Set(["patch", "minor", "major"]);
 
 const bump = process.argv[2];
-const description = process.argv[3];
-if (!BUMP_TYPES.has(bump) || (description !== undefined && !/^[a-z0-9][a-z0-9-]*$/.test(description))) {
-	console.error("Usage: npm run release -- <patch|minor|major> [branch-description]");
-	console.error("  branch-description: optional kebab-case suffix, e.g. hotfix-tooltip");
+if (!BUMP_TYPES.has(bump)) {
+	console.error("Usage: npm run release -- <patch|minor|major>");
 	process.exit(1);
 }
 
@@ -45,15 +44,14 @@ run(`npm version ${bump}`);
 const { version } = JSON.parse(readFileSync("package.json", "utf8"));
 
 // 3. Land the bump on a release branch, carrying the uncommitted changes over.
-//    The branch is release/<version> with an optional description suffix
-//    (release/<version>-<description>); if we're already on a release branch for
-//    this version (whatever its suffix), reuse it rather than making another.
+//    The branch is release/<version>, but if we're already on a release branch
+//    for this version — including one named with a descriptive suffix like
+//    release/<version>-first-final — keep it rather than switching to the bare
+//    name.
 const current = capture("git rev-parse --abbrev-ref HEAD");
 const escaped = version.replace(/[.]/g, "\\.");
-const onReleaseBranch = new RegExp(`^release/${escaped}(-[a-z0-9-]+)?$`).test(current);
-const branch = onReleaseBranch
-	? current
-	: `release/${version}${description ? `-${description}` : ""}`;
+const onReleaseBranch = new RegExp(`^release/${escaped}(-.+)?$`).test(current);
+const branch = onReleaseBranch ? current : `release/${version}`;
 
 if (current !== branch) {
 	run(capture(`git branch --list ${branch}`) ? `git checkout ${branch}` : `git checkout -b ${branch}`);

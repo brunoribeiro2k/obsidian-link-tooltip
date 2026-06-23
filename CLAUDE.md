@@ -80,10 +80,11 @@ Goal: prepare this for submission to the **Obsidian community plugins** list.
 - `npm run deploy -- --vault "/path/to/Vault"` — build + copy into a vault for
   local testing. Also accepts `--plugin-dir`, or `OBSIDIAN_VAULT` /
   `OBSIDIAN_PLUGIN_DIR` env vars.
-- `npm run release -- <patch|minor|major> [branch-description]` — cut a release.
-  From a clean tree it bumps the version (syncing `manifest.json` + `versions.json`
-  via `version-bump.mjs`), lands it on a `release/<version>` branch (optional
-  kebab-case suffix → `release/<version>-<description>`), commits, pushes,
+- `npm run release -- <patch|minor|major>` — cut a release. From a clean tree it
+  bumps the version (syncing `manifest.json` + `versions.json` via
+  `version-bump.mjs`), lands it on a `release/<version>` branch (or keeps the
+  current branch if it already matches `release/<version>`, including a manual
+  `-<description>` suffix), commits, pushes,
   and opens a PR to master. It does **not** tag. Merging the PR triggers
   `release.yml`, which tags the merged commit (no `v` prefix) and drafts the
   GitHub release. Then review the draft notes and publish.
