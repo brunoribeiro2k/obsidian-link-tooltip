@@ -5,7 +5,8 @@
 	"main": "main.js",
 	"scripts": {
 		"dev": "node esbuild.config.mjs",
-		"build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
+		"lint": "eslint .",
+		"build": "tsc -noEmit -skipLibCheck && eslint . && node esbuild.config.mjs production",
 		"test": "node --test",
 		"setup-vault": "npm run build && node scripts/setup-test-vault.mjs",
 		"deploy": "npm run build && node scripts/deploy.mjs",
@@ -22,8 +23,12 @@
 	"devDependencies": {
 		"@codemirror/language": "^6.11.0",
 		"@codemirror/view": "^6.36.8",
+		"@eslint/js": "^10.0.1",
 		"esbuild": "^0.25.0",
+		"eslint": "^10.5.0",
+		"globals": "^17.7.0",
 		"obsidian": "^1.8.7",
-		"typescript": "^5.8.2"
+		"typescript": "^5.8.2",
+		"typescript-eslint": "^8.62.0"
 	}
 }
