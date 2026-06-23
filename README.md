@@ -10,7 +10,7 @@ Obsidian already shows native browser-style tooltips for real `<a href>` element
 
 - Registers a CodeMirror 6 extension for editor views.
 - Detects hover on rendered Markdown links and wikilinks in Live Preview and source mode.
-- Reads the hovered link's destination from the document text (shown as its literal target for internal links), not from hidden DOM spans.
+- Recovers the hovered link's destination from CodeMirror's syntax tree (shown as its literal target for internal links), not from hidden DOM spans.
 - Shows the destination in a small floating tooltip near the cursor.
 - Persists its settings with Obsidian's `loadData()` / `saveData()` plugin data APIs.
 
