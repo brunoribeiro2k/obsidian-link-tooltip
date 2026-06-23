@@ -1,8 +1,9 @@
-/* CodeMirror wraps our content in .cm-tooltip.cm-tooltip-hover and applies a
-   hardcoded grey bubble from its base theme. Re-skin only our own tooltip
-   (scoped with :has) using Obsidian variables so it stays theme-aware across
-   light/dark/custom themes and matches the rest of the editor UI. */
-.cm-tooltip.cm-tooltip-hover:has(.link-tooltip-content) {
+/* CodeMirror wraps our content in a .cm-tooltip element and applies a hardcoded
+   grey bubble from its base theme. The plugin tags that wrapper with
+   .link-tooltip (in the tooltip's mount hook), so we re-skin only our own
+   tooltip using Obsidian variables — keeping it theme-aware across
+   light/dark/custom themes and matching the rest of the editor UI. */
+.cm-tooltip.link-tooltip {
 	border: 1px solid var(--background-modifier-border);
 	border-radius: 6px;
 	background: var(--background-secondary);
