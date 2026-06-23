@@ -8,7 +8,11 @@
  * git tag (`.npmrc` sets `git-tag-version=false`; the workflow owns tags, and a
  * local tag would collide with the one it pushes).
  *
- *   npm run release -- <patch|minor|major>
+ *   npm run release -- <patch|minor|major> [branch-description]
+ *
+ * The branch is release/<version>, with an optional kebab-case description
+ * suffix (release/<version>-<description>) when several release branches for one
+ * version would otherwise clash.
  *
  * Refuses to run on a dirty tree so the release commit contains only the bump,
  * and reuses an existing PR/branch instead of erroring if one is already open.
@@ -19,8 +23,10 @@ import { readFileSync } from "node:fs";
 const BUMP_TYPES = new Set(["patch", "minor", "major"]);
 
 const bump = process.argv[2];
-if (!BUMP_TYPES.has(bump)) {
-	console.error("Usage: npm run release -- <patch|minor|major>");
+const description = process.argv[3];
+if (!BUMP_TYPES.has(bump) || (description !== undefined && !/^[a-z0-9][a-z0-9-]*$/.test(description))) {
+	console.error("Usage: npm run release -- <patch|minor|major> [branch-description]");
+	console.error("  branch-description: optional kebab-case suffix, e.g. hotfix-tooltip");
 	process.exit(1);
 }
 
@@ -37,10 +43,19 @@ if (capture("git status --porcelain")) {
 //    versions.json via the `version` lifecycle). No tag — the workflow tags.
 run(`npm version ${bump}`);
 const { version } = JSON.parse(readFileSync("package.json", "utf8"));
-const branch = `release/${version}`;
 
-// 3. Land the bump on release/<version>, carrying the uncommitted changes over.
-if (capture("git rev-parse --abbrev-ref HEAD") !== branch) {
+// 3. Land the bump on a release branch, carrying the uncommitted changes over.
+//    The branch is release/<version> with an optional description suffix
+//    (release/<version>-<description>); if we're already on a release branch for
+//    this version (whatever its suffix), reuse it rather than making another.
+const current = capture("git rev-parse --abbrev-ref HEAD");
+const escaped = version.replace(/[.]/g, "\\.");
+const onReleaseBranch = new RegExp(`^release/${escaped}(-[a-z0-9-]+)?$`).test(current);
+const branch = onReleaseBranch
+	? current
+	: `release/${version}${description ? `-${description}` : ""}`;
+
+if (current !== branch) {
 	run(capture(`git branch --list ${branch}`) ? `git checkout ${branch}` : `git checkout -b ${branch}`);
 }
 
