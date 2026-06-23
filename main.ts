@@ -26,7 +26,8 @@ export default class LinkTooltipPlugin extends Plugin {
 	}
 
 	async loadSettings(): Promise<void> {
-		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+		const data = (await this.loadData()) as Partial<LinkTooltipSettings> | null;
+		this.settings = Object.assign({}, DEFAULT_SETTINGS, data);
 	}
 
 	async saveSettings(): Promise<void> {
@@ -127,7 +128,15 @@ function createLinkTooltipExtension(plugin: LinkTooltipPlugin) {
 					const dom = view.dom.ownerDocument.createElement("div");
 					dom.addClass("link-tooltip-content");
 					dom.setText(link.url);
-					return { dom };
+					return {
+						dom,
+						mount() {
+							// CodeMirror wraps `dom` in its own .cm-tooltip
+							// element. Tag that wrapper so styles.css can re-skin
+							// only our tooltip without a :has() selector.
+							dom.parentElement?.addClass("link-tooltip");
+						},
+					};
 				},
 			};
 		},
