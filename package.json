@@ -1,6 +1,6 @@
 {
 	"name": "obsidian-link-tooltip",
-	"version": "0.2.0",
+	"version": "0.2.1",
 	"description": "Show where a hovered link points in Obsidian Live Preview and source mode.",
 	"main": "main.js",
 	"scripts": {
