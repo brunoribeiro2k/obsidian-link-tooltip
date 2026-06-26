@@ -127,13 +127,10 @@ class LinkTooltipSettingTab extends PluginSettingTab {
 			)
 			.addSlider((component) => {
 				slider = component;
-				// `setInstant` (Obsidian 1.6.6+) makes onChange fire while dragging
-				// rather than only on release. Feature-detect it so the settings
-				// tab still works below our 1.5.0 minAppVersion.
-				if (typeof component.setInstant === "function") {
-					component.setInstant(true);
-				}
+				// `setInstant` (Obsidian 1.6.6+, our minAppVersion) makes onChange
+				// fire while dragging rather than only on release.
 				component
+					.setInstant(true)
 					.setLimits(0, 1000, 50)
 					.setValue(this.plugin.settings.hoverDelay)
 					.onChange(async (value) => {
