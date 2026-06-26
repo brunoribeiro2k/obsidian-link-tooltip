@@ -1,28 +1,55 @@
-import { App, Notice, Plugin, PluginSettingTab, Setting } from "obsidian";
+import {
+	App,
+	Notice,
+	Plugin,
+	PluginSettingTab,
+	Setting,
+	SliderComponent,
+	TextComponent,
+} from "obsidian";
 import { EditorView, hoverTooltip } from "@codemirror/view";
+import { Extension } from "@codemirror/state";
 import { syntaxTree } from "@codemirror/language";
 import { isExternalUrl } from "./url.mjs";
 
 interface LinkTooltipSettings {
 	externalLinks: boolean;
 	internalLinks: boolean;
+	hoverDelay: number;
 	debugLogging: boolean;
 }
 
 const DEFAULT_SETTINGS: LinkTooltipSettings = {
 	externalLinks: true,
 	internalLinks: true,
+	// Milliseconds the pointer must rest on a link before the tooltip shows.
+	// Matches CodeMirror's own `hoverTime` default.
+	hoverDelay: 300,
 	debugLogging: false,
 };
 
 export default class LinkTooltipPlugin extends Plugin {
 	settings: LinkTooltipSettings = { ...DEFAULT_SETTINGS };
 
+	// A stable array reference handed to CodeMirror; we swap its contents and
+	// call `updateOptions()` to apply settings that are baked in at extension
+	// construction (e.g. the hover delay) without reloading the plugin.
+	private readonly editorExtension: Extension[] = [];
+
 	async onload(): Promise<void> {
 		await this.loadSettings();
 
 		this.addSettingTab(new LinkTooltipSettingTab(this.app, this));
-		this.registerEditorExtension(createLinkTooltipExtension(this));
+		this.editorExtension.push(createLinkTooltipExtension(this));
+		this.registerEditorExtension(this.editorExtension);
+	}
+
+	// Rebuild the hover extension and push it live into open editors. Needed
+	// because `hoverTime` is captured when `hoverTooltip` is created.
+	reconfigureEditorExtension(): void {
+		this.editorExtension.length = 0;
+		this.editorExtension.push(createLinkTooltipExtension(this));
+		this.app.workspace.updateOptions();
 	}
 
 	async loadSettings(): Promise<void> {
@@ -78,6 +105,66 @@ class LinkTooltipSettingTab extends PluginSettingTab {
 					.onChange(async (value) => {
 						this.plugin.settings.internalLinks = value;
 						await this.plugin.saveSettings();
+					});
+			});
+
+		// Slider and number box are two views of the same value; each updates the
+		// other without re-firing onChange (Obsidian's setValue doesn't dispatch
+		// an input event), so there's no feedback loop.
+		let slider: SliderComponent;
+		let text: TextComponent;
+
+		const applyDelay = async (value: number) => {
+			this.plugin.settings.hoverDelay = value;
+			await this.plugin.saveSettings();
+			this.plugin.reconfigureEditorExtension();
+		};
+
+		new Setting(containerEl)
+			.setName("Tooltip delay")
+			.setDesc(
+				"Milliseconds to wait after hovering a link before the tooltip appears. Set to 0 to show it immediately.",
+			)
+			.addSlider((component) => {
+				slider = component;
+				// `setInstant` (Obsidian 1.6.6+) makes onChange fire while dragging
+				// rather than only on release. Feature-detect it so the settings
+				// tab still works below our 1.5.0 minAppVersion.
+				if (typeof component.setInstant === "function") {
+					component.setInstant(true);
+				}
+				component
+					.setLimits(0, 1000, 50)
+					.setValue(this.plugin.settings.hoverDelay)
+					.onChange(async (value) => {
+						text.setValue(String(value));
+						await applyDelay(value);
+					});
+			})
+			.addText((component) => {
+				text = component;
+				component.inputEl.type = "number";
+				component.inputEl.min = "0";
+				component.inputEl.max = "1000";
+				component.inputEl.step = "50";
+				component
+					.setValue(String(this.plugin.settings.hoverDelay))
+					.onChange(async (raw) => {
+						if (raw.trim() === "") {
+							return;
+						}
+
+						const parsed = Number(raw);
+						if (Number.isNaN(parsed)) {
+							return;
+						}
+
+						const value = Math.min(1000, Math.max(0, Math.round(parsed)));
+						slider.setValue(value);
+						if (String(value) !== raw) {
+							component.setValue(String(value));
+						}
+						await applyDelay(value);
 					});
 			});
 
@@ -140,7 +227,10 @@ function createLinkTooltipExtension(plugin: LinkTooltipPlugin) {
 				},
 			};
 		},
-		{ hideOnChange: true },
+		// CodeMirror reads `hoverTime` as `options.hoverTime || 300`, so a 0 here
+		// would silently revert to 300ms. Map 0 (the "show immediately" setting)
+		// to 1ms so it stays effectively instant.
+		{ hideOnChange: true, hoverTime: plugin.settings.hoverDelay || 1 },
 	);
 }
 
