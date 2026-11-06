@@ -280,12 +280,14 @@ function resolveMarkdownLink(
 	index: number,
 	settings: LinkTooltipSettings,
 ): LinkTooltipTarget | null {
-	// Segment the one link around `index`. Adjacent links touch only at a
-	// url -> label transition (a closing `)` followed by the next `[`), so split
-	// the contiguous "md" run there.
+	// Segment the one link around `index`. A link is a gapless run of "md"
+	// tokens: plain text between two links isn't a token, so a gap ends the run.
+	// Links that touch with no gap meet only at a url -> label transition (a
+	// closing `)` followed by the next `[`), so split the run there too.
 	let start = index;
 	while (
 		start > 0 &&
+		leaves[start - 1].to === leaves[start].from &&
 		linkFamily(leaves[start - 1].name) === "md" &&
 		!(
 			markdownRole(leaves[start].name) === "label" &&
@@ -298,6 +300,7 @@ function resolveMarkdownLink(
 	let end = index;
 	while (
 		end < leaves.length - 1 &&
+		leaves[end].to === leaves[end + 1].from &&
 		linkFamily(leaves[end + 1].name) === "md" &&
 		!(
 			markdownRole(leaves[end].name) === "url" &&

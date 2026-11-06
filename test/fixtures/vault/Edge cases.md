@@ -20,3 +20,10 @@ The character immediately after the closing paren must NOT show a tooltip.
 ## Multiple links on one line — EXPECT: TOOLTIP on each
 
 See [first](https://example.com/1) and [second](https://example.com/2).
+
+## Link followed by a raw URL — EXPECT: TOOLTIP showing the link's own destination
+
+Hovering the label must show `https://example.com/own`, not the raw URL later on
+the line:
+
+See [own destination](https://example.com/own) and then https://example.com/raw here.
