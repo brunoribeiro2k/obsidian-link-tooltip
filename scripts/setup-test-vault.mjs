@@ -11,7 +11,7 @@
  * leaves anything else in the vault (Obsidian's workspace, your scratch notes)
  * untouched.
  */
-import { access, copyFile, mkdir, readFile, readdir, writeFile } from "node:fs/promises";
+import { access, copyFile, cp, mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -31,11 +31,9 @@ try {
 	process.exit(1);
 }
 
-// 1. Seed the sample notes from the committed fixtures.
+// 1. Seed the sample notes from the committed fixtures, folders included.
 await mkdir(vaultDir, { recursive: true });
-for (const entry of await readdir(fixturesDir)) {
-	await copyFile(path.join(fixturesDir, entry), path.join(vaultDir, entry));
-}
+await cp(fixturesDir, vaultDir, { recursive: true });
 
 // 2. Deploy the current build into the vault's plugin folder.
 await mkdir(pluginDir, { recursive: true });

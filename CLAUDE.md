@@ -9,7 +9,11 @@ while editing — in **Live Preview** and **source mode**. A tooltip appears for
 link that hides its destination behind a label: every Markdown link `[label](dest)`
 (external URL or internal note path, shown as its literal target) and aliased
 wikilinks `[[target|alias]]`. Bare links — raw autolinks and unaliased `[[Note]]` —
-already show their destination as text, so they get no tooltip.
+already show their destination as text, so by default they get no tooltip: a
+tooltip that would only repeat the link's visible text is skipped unless the
+"already show their destination" setting is on. With "Show full path for internal
+links", internal links show the vault file they resolve to (`metadataCache`), so
+unaliased wikilinks get a tooltip when their folder is hidden (#56).
 
 Scope decision (intentional): Reading mode is **out of scope**. Obsidian already
 renders real `<a href>` elements with native browser tooltips there. This plugin
@@ -36,12 +40,17 @@ Goal: prepare this for submission to the **Obsidian community plugins** list.
   tree marks `[[wikilinks]]` as internal but tokenizes `[](note)` and `[](https://…)`
   identically). Standalone so it can be unit-tested with `node --test` without bundling
   `obsidian` / `@codemirror/*`.
+- `visible.mjs` — dependency-free `repeatsVisibleText`, the "already visible" check
+  (tooltip text vs. the link's label/alias/target, ignoring an internal `.md`).
+  Standalone for the same reason as `url.mjs`.
 - `test/is-external-url.test.mjs` — `node --test` cases for `isExternalUrl`:
   allowed schemes vs. rejected false positives (`c:\…`, `note:`, `tel:`, …).
+- `test/repeats-visible-text.test.mjs` — `node --test` cases for `repeatsVisibleText`.
 - `test/fixtures/vault/` — version-controlled sample notes (Markdown/wikilinks,
-  aliased vs. bare, code spans/blocks, angle-bracket destinations, range edges), each
-  labelled `EXPECT: TOOLTIP` / `EXPECT: NO TOOLTIP`. Token-driven detection needs a
-  live editor and can't run under `node --test`, so these drive manual verification.
+  aliased vs. bare, code spans/blocks, angle-bracket destinations, range edges, full
+  paths with a nested `Projects/2026/` folder), each labelled `EXPECT: TOOLTIP` /
+  `EXPECT: NO TOOLTIP`. Token-driven detection needs a live editor and can't run
+  under `node --test`, so these drive manual verification.
 - `scripts/setup-test-vault.mjs` — builds the gitignored `test-vault/` from those
   fixtures, deploys the current build into it, and enables the plugin, so it opens in
   Obsidian ready to test. Run with `npm run setup-vault`.
@@ -89,7 +98,7 @@ Each has a `make` wrapper (`make check`, `make vault`, `make open`,
 - `npm run build` — typecheck (`tsc -noEmit -skipLibCheck`), lint, then production
   bundle. Lint (`npm run lint`) runs the official `eslint-plugin-obsidianmd`
   recommended config, i.e. the checks the community review applies.
-- `npm test` — run the `node --test` unit tests (`isExternalUrl`).
+- `npm test` — run the `node --test` unit tests (`isExternalUrl`, `repeatsVisibleText`).
 - `npm run setup-vault` — build, then (re)generate the gitignored `test-vault/` from
   `test/fixtures/vault/` with the plugin deployed and enabled. Open it as a vault to
   verify detection (token-driven detection has no `node --test` coverage).
@@ -107,9 +116,9 @@ Each has a `make` wrapper (`make check`, `make vault`, `make open`,
   GitHub release. Then review the draft notes and publish.
 
 Always run `npm run build` before considering a change done — it is the typecheck
-gate. Run `npm test` (`node --test`) for the `isExternalUrl` unit tests. Because
-detection is token-driven and can't be unit-tested, verify link behaviour changes in
-Obsidian via `npm run setup-vault`.
+gate. Run `npm test` (`node --test`) for the `isExternalUrl` / `repeatsVisibleText`
+unit tests. Because detection is token-driven and can't be unit-tested, verify link
+behaviour changes in Obsidian via `npm run setup-vault`.
 
 ## Conventions / hard rules
 

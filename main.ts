@@ -4,15 +4,20 @@ import {
 	Plugin,
 	PluginSettingTab,
 	type SettingDefinitionItem,
+	editorInfoField,
+	parseLinktext,
 } from "obsidian";
 import { EditorView, hoverTooltip } from "@codemirror/view";
 import { Extension } from "@codemirror/state";
 import { syntaxTree } from "@codemirror/language";
 import { isExternalUrl } from "./url.mjs";
+import { repeatsVisibleText } from "./visible.mjs";
 
 interface LinkTooltipSettings {
 	externalLinks: boolean;
 	internalLinks: boolean;
+	internalFullPath: boolean;
+	showVisibleDestinations: boolean;
 	hoverDelay: number;
 	debugLogging: boolean;
 }
@@ -20,6 +25,10 @@ interface LinkTooltipSettings {
 const DEFAULT_SETTINGS: LinkTooltipSettings = {
 	externalLinks: true,
 	internalLinks: true,
+	// Resolve internal links to the file they point to (#56).
+	internalFullPath: false,
+	// Also show tooltips that only repeat what the link already shows (#56).
+	showVisibleDestinations: false,
 	// Milliseconds the pointer must rest on a link before the tooltip shows.
 	// Matches CodeMirror's own `hoverTime` default.
 	hoverDelay: 300,
@@ -59,6 +68,14 @@ export default class LinkTooltipPlugin extends Plugin {
 		await this.saveData(this.settings);
 	}
 
+	// Resolve an internal link's target (as written, e.g. "Note#Heading") to the
+	// vault file it points to, keeping the subpath. Null when no such file exists.
+	resolveInternalLink(linktext: string, sourcePath: string): string | null {
+		const { path, subpath } = parseLinktext(linktext);
+		const file = this.app.metadataCache.getFirstLinkpathDest(path, sourcePath);
+		return file ? `${file.path}${subpath}` : null;
+	}
+
 	debug(message: string, ...data: unknown[]): void {
 		if (!this.settings.debugLogging) {
 			return;
@@ -92,6 +109,18 @@ class LinkTooltipSettingTab extends PluginSettingTab {
 				control: { type: "toggle", key: "internalLinks" },
 			},
 			{
+				name: "Show full path for internal links",
+				desc: "Show the file each internal link points to in the vault, e.g. Projects/2026/Note.md, instead of the target as written. Also adds tooltips to links without an alias when their path isn't already visible.",
+				// Only meaningful while internal tooltips are on.
+				visible: () => this.plugin.settings.internalLinks,
+				control: { type: "toggle", key: "internalFullPath" },
+			},
+			{
+				name: "Show tooltips for links that already show their destination",
+				desc: "Also show the tooltip when it would repeat what the link shows: raw URLs, links without an alias, and links whose label matches their destination.",
+				control: { type: "toggle", key: "showVisibleDestinations" },
+			},
+			{
 				name: "Tooltip delay",
 				desc: "Milliseconds to wait after hovering a link before the tooltip appears. Set to 0 to show it immediately.",
 				aliases: ["hover delay"],
@@ -116,6 +145,10 @@ class LinkTooltipSettingTab extends PluginSettingTab {
 	async setControlValue(key: string, value: unknown): Promise<void> {
 		await super.setControlValue(key, value);
 
+		if (key === "internalLinks") {
+			// Re-evaluate `visible` on the internal-only settings.
+			this.update();
+		}
 		if (key === "hoverDelay") {
 			// The delay is baked into the hover extension; rebuild it live.
 			this.plugin.reconfigureEditorExtension();
@@ -129,6 +162,8 @@ class LinkTooltipSettingTab extends PluginSettingTab {
 
 interface LinkTooltipTarget {
 	url: string;
+	// A short remark shown after the destination, e.g. for a missing note.
+	note?: string;
 	from: number;
 	to: number;
 }
@@ -138,7 +173,7 @@ function createLinkTooltipExtension(plugin: LinkTooltipPlugin) {
 	// window placement, hide-on-scroll — to CodeMirror's own tooltip system.
 	return hoverTooltip(
 		(view, pos) => {
-			const link = getLinkTooltipAt(view, pos, plugin.settings);
+			const link = getLinkTooltipAt(view, pos, plugin);
 
 			if (!link) {
 				return null;
@@ -159,6 +194,9 @@ function createLinkTooltipExtension(plugin: LinkTooltipPlugin) {
 						cls: "link-tooltip-content",
 						text: link.url,
 					});
+					if (link.note) {
+						dom.createSpan({ cls: "link-tooltip-note", text: link.note });
+					}
 					return {
 						dom,
 						mount() {
@@ -240,7 +278,7 @@ function markdownRole(name: string): "label" | "url" | null {
 function getLinkTooltipAt(
 	view: EditorView,
 	pos: number,
-	settings: LinkTooltipSettings,
+	plugin: LinkTooltipPlugin,
 ): LinkTooltipTarget | null {
 	const tree = syntaxTree(view.state);
 	const line = view.state.doc.lineAt(pos);
@@ -265,20 +303,70 @@ function getLinkTooltipAt(
 
 	const family = linkFamily(leaves[index].name);
 	if (family === "md") {
-		return resolveMarkdownLink(view, leaves, index, settings);
+		return resolveMarkdownLink(view, leaves, index, plugin);
 	}
 	if (family === "wiki") {
-		return resolveWikilink(view, leaves, index, settings);
+		return resolveWikilink(view, leaves, index, plugin);
 	}
 
 	return null;
+}
+
+// What a link reveals, before the per-kind settings and the "already visible"
+// rule decide whether it gets a tooltip.
+interface LinkCandidate {
+	// The destination as written in the note.
+	destination: string;
+	// What the editor shows for the link: its label or alias, or for a link
+	// with neither, its destination.
+	visible: string;
+	external: boolean;
+	from: number;
+	to: number;
+}
+
+// Shared tail for both link families: gate by kind, optionally resolve the
+// internal path, and drop tooltips that would only repeat the visible text.
+function finishLink(
+	view: EditorView,
+	link: LinkCandidate,
+	plugin: LinkTooltipPlugin,
+	// Turns the written destination into Obsidian link text (e.g. decodes a
+	// Markdown link's %20) before it's resolved against the vault.
+	toLinktext: (destination: string) => string = (destination) => destination,
+): LinkTooltipTarget | null {
+	const { settings } = plugin;
+	if (!(link.external ? settings.externalLinks : settings.internalLinks)) {
+		return null;
+	}
+
+	let url = link.destination;
+	let note: string | undefined;
+	if (!link.external && settings.internalFullPath) {
+		const sourcePath = view.state.field(editorInfoField, false)?.file?.path ?? "";
+		const resolved = plugin.resolveInternalLink(toLinktext(link.destination), sourcePath);
+		if (resolved) {
+			url = resolved;
+		} else {
+			note = "not created yet";
+		}
+	}
+
+	if (
+		!settings.showVisibleDestinations &&
+		repeatsVisibleText(url, link.visible, !link.external)
+	) {
+		return null;
+	}
+
+	return { url, note, from: link.from, to: link.to };
 }
 
 function resolveMarkdownLink(
 	view: EditorView,
 	leaves: LeafToken[],
 	index: number,
-	settings: LinkTooltipSettings,
+	plugin: LinkTooltipPlugin,
 ): LinkTooltipTarget | null {
 	// Segment the one link around `index`. A link is a gapless run of "md"
 	// tokens: plain text between two links isn't a token, so a gap ends the run.
@@ -310,21 +398,24 @@ function resolveMarkdownLink(
 		end += 1;
 	}
 
-	// The destination is the url *content* token (carries "url" but not the
-	// "formatting" of the parens). A label must be present too, otherwise this is
-	// a bare autolink, which already shows its destination.
+	// The destination is the url *content* token: it carries "url" but isn't
+	// one of the parens around it ("formatting-link-string"). A run without
+	// those parens is an autolink — a raw `https://…` or `<https://…>` — whose
+	// destination is its own text. The label is the non-formatting "link" text.
 	let destToken: LeafToken | null = null;
-	let hasLabel = false;
+	let isAutolink = true;
+	let label = "";
 	for (let i = start; i <= end; i += 1) {
 		const cls = classesOf(leaves[i].name);
-		if (cls.includes("url") && !cls.includes("formatting")) {
+		if (cls.includes("formatting-link-string")) {
+			isAutolink = false;
+		} else if (cls.includes("url")) {
 			destToken = leaves[i];
-		}
-		if (markdownRole(leaves[i].name) === "label") {
-			hasLabel = true;
+		} else if (cls.includes("link") && !cls.includes("formatting")) {
+			label += view.state.doc.sliceString(leaves[i].from, leaves[i].to);
 		}
 	}
-	if (!destToken || !hasLabel) {
+	if (!destToken) {
 		return null;
 	}
 
@@ -335,21 +426,26 @@ function resolveMarkdownLink(
 		return null;
 	}
 
-	const kind = isExternalUrl(destination) ? "external" : "internal";
-	const enabled =
-		kind === "external" ? settings.externalLinks : settings.internalLinks;
-	if (!enabled) {
-		return null;
-	}
-
-	return { url: destination, from: leaves[start].from, to: leaves[end].to };
+	return finishLink(
+		view,
+		{
+			destination,
+			visible: isAutolink ? destination : label,
+			// The tokenizer only recognizes URLs and emails as autolinks.
+			external: isAutolink || isExternalUrl(destination),
+			from: leaves[start].from,
+			to: leaves[end].to,
+		},
+		plugin,
+		decodeDestination,
+	);
 }
 
 function resolveWikilink(
 	view: EditorView,
 	leaves: LeafToken[],
 	index: number,
-	settings: LinkTooltipSettings,
+	plugin: LinkTooltipPlugin,
 ): LinkTooltipTarget | null {
 	let start = index;
 	while (start >= 0 && linkFamily(leaves[start].name) === "wiki") {
@@ -362,6 +458,12 @@ function resolveWikilink(
 		start < 0 ||
 		!classesOf(leaves[start].name).includes("formatting-link-start")
 	) {
+		return null;
+	}
+
+	// An embed (`![[…]]`) renders the target's content rather than a link, and
+	// its "alias" is often an image size, so it never gets a tooltip.
+	if (classesOf(leaves[start].name).includes("formatting-embed")) {
 		return null;
 	}
 
@@ -379,8 +481,8 @@ function resolveWikilink(
 		return null;
 	}
 
-	// Only aliased wikilinks hide their destination; a bare [[Note]] already shows
-	// it. The alias pipe is the marker.
+	// The alias pipe, when present, splits the target from the alias shown in
+	// its place. Without one, the editor shows the target itself.
 	let pipe: LeafToken | null = null;
 	for (let i = start; i <= end; i += 1) {
 		if (classesOf(leaves[i].name).includes("link-alias-pipe")) {
@@ -388,20 +490,26 @@ function resolveWikilink(
 			break;
 		}
 	}
-	if (!pipe) {
-		return null;
-	}
 
-	if (!settings.internalLinks) {
-		return null;
-	}
-
-	const destination = view.state.doc.sliceString(leaves[start].to, pipe.from).trim();
+	const { doc } = view.state;
+	const destination = doc
+		.sliceString(leaves[start].to, pipe ? pipe.from : leaves[end].from)
+		.trim();
 	if (!destination) {
 		return null;
 	}
 
-	return { url: destination, from: leaves[start].from, to: leaves[end].to };
+	return finishLink(
+		view,
+		{
+			destination,
+			visible: pipe ? doc.sliceString(pipe.to, leaves[end].from) : destination,
+			external: false,
+			from: leaves[start].from,
+			to: leaves[end].to,
+		},
+		plugin,
+	);
 }
 
 function normalizeDestination(text: string): string {
@@ -412,4 +520,14 @@ function normalizeDestination(text: string): string {
 	}
 
 	return url.replace(/\\([\\`*_[\]{}()#+\-.!<>])/g, "$1");
+}
+
+// Markdown link destinations are URL-encoded (`My%20Note.md`); vault lookups
+// want the plain path. A stray `%` that isn't an escape is kept as written.
+function decodeDestination(destination: string): string {
+	try {
+		return decodeURI(destination);
+	} catch {
+		return destination;
+	}
 }
