@@ -2,7 +2,7 @@
  * Prepare a release PR.
  *
  * The local half of the release flow: bump the version, put it on a
- * `release/<version>` branch, commit, push, and open a PR to master. Merging
+ * `release/<version>` branch, commit, push, and open a PR to main. Merging
  * that PR is what triggers the release workflow, which tags the merged commit
  * and drafts the GitHub release — so this script deliberately never creates a
  * git tag (`.npmrc` sets `git-tag-version=false`; the workflow owns tags, and a
@@ -73,7 +73,7 @@ run(`git push -u origin ${branch}`);
 const title = `chore(release): ${version}`;
 let prUrl = "";
 try {
-	prUrl = capture(`gh pr list --head ${branch} --base master --state open --json url --jq ".[0].url // \\"\\""`);
+	prUrl = capture(`gh pr list --head ${branch} --base main --state open --json url --jq ".[0].url // \\"\\""`);
 } catch {
 	// gh missing or unauthenticated — handled below.
 }
@@ -83,10 +83,10 @@ if (prUrl) {
 } else {
 	try {
 		const body = `Release ${version}. Merging tags the version and drafts the GitHub release.`;
-		const url = capture(`gh pr create --base master --head ${branch} --title "${title}" --body "${body}"`);
+		const url = capture(`gh pr create --base main --head ${branch} --title "${title}" --body "${body}"`);
 		console.log(`\nOpened release PR: ${url}`);
 	} catch {
-		console.log(`\nBranch pushed. Open the PR manually:\n  gh pr create --base master --head ${branch} --title "${title}"`);
+		console.log(`\nBranch pushed. Open the PR manually:\n  gh pr create --base main --head ${branch} --title "${title}"`);
 	}
 }
 

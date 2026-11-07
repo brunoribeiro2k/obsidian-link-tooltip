@@ -60,9 +60,9 @@ Goal: prepare this for submission to the **Obsidian community plugins** list.
   bumps files; the release workflow owns tags).
 - `scripts/prepare-release.mjs` — local half of the release flow (`npm run
   release -- <patch|minor|major>`): bumps the version on a clean tree, lands it on
-  a `release/<version>` branch, commits, pushes, and opens a PR to master. Never
+  a `release/<version>` branch, commits, pushes, and opens a PR to main. Never
   tags — merging the PR is what releases.
-- `.github/workflows/release.yml` — runs on pushes to `master`: when
+- `.github/workflows/release.yml` — runs on pushes to `main`: when
   `manifest.json`'s version has no release yet, builds, attests provenance,
   pushes the matching tag, and creates a draft GitHub release with `main.js` /
   `manifest.json` / `styles.css`. Idempotent; reports via job summary + a commit
@@ -90,7 +90,7 @@ Goal: prepare this for submission to the **Obsidian community plugins** list.
   `version-bump.mjs`), lands it on a `release/<version>` branch (or keeps the
   current branch if it already matches `release/<version>`, including a manual
   `-<description>` suffix), commits, pushes,
-  and opens a PR to master. It does **not** tag. Merging the PR triggers
+  and opens a PR to main. It does **not** tag. Merging the PR triggers
   `release.yml`, which tags the merged commit (no `v` prefix) and drafts the
   GitHub release. Then review the draft notes and publish.
 
