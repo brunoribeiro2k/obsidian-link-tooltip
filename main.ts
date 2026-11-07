@@ -66,7 +66,7 @@ export default class LinkTooltipPlugin extends Plugin {
 			return;
 		}
 
-		console.log(`[link-tooltip] ${message}`, ...data);
+		console.debug(`[link-tooltip] ${message}`, ...data);
 	}
 }
 
@@ -174,7 +174,7 @@ class LinkTooltipSettingTab extends PluginSettingTab {
 					.onChange(async (value) => {
 						this.plugin.settings.debugLogging = value;
 						if (value) {
-							new Notice("Link Tooltip debug logging enabled");
+							new Notice("Debug logging enabled. Hover diagnostics go to the developer console.");
 						}
 						this.plugin.debug("debug logging enabled");
 						await this.plugin.saveSettings();
@@ -206,12 +206,15 @@ function createLinkTooltipExtension(plugin: LinkTooltipPlugin) {
 				pos: link.from,
 				end: link.to,
 				create() {
-					// Build in the view's own document so the element is valid in
+					// Build with the view's own window so the element is valid in
 					// a detached pop-out window; CodeMirror appends it into that
-					// window's tooltip layer.
-					const dom = view.dom.ownerDocument.createElement("div");
-					dom.addClass("link-tooltip-content");
-					dom.setText(link.url);
+					// window's tooltip layer. Obsidian installs its DOM helpers on
+					// every window but only types them as globals, hence the cast.
+					const win = view.dom.ownerDocument.win as typeof window;
+					const dom = win.createDiv({
+						cls: "link-tooltip-content",
+						text: link.url,
+					});
 					return {
 						dom,
 						mount() {

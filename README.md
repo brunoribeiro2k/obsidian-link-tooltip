@@ -48,9 +48,9 @@ If the plugin enabled but hover display is not working:
 1. Open **Settings -> Community plugins -> Link Tooltip**.
 2. Enable **Debug logging**.
 3. Hover a Markdown link or aliased wikilink in Live Preview or source mode.
-4. Filter the console for `link-tooltip`.
+4. Filter the console for `link-tooltip`, with the log level set to include **Verbose**.
 
-When debug logging is enabled, Obsidian should show a small notice and the console should show normal `console.log` entries prefixed with `[link-tooltip]`.
+When debug logging is enabled, Obsidian should show a small notice and the console should show `console.debug` entries prefixed with `[link-tooltip]`. Chromium hides debug entries at the default log level, so pick **Verbose** in the console's level dropdown.
 
 The hover diagnostics include the hovered position and the parsed link (its range, destination, kind, and whether it is aliased).
 
@@ -88,7 +88,7 @@ Install dependencies once with `npm install`, then:
 
 - `npm run dev` — esbuild in watch mode (rebuilds `main.js` on change, inline sourcemaps).
 - `npm run build` — the done-gate: typecheck (`tsc`), lint (`eslint`), then the production bundle.
-- `npm run lint` — ESLint on its own.
+- `npm run lint` — ESLint on its own, with the official `eslint-plugin-obsidianmd` rules the community review applies.
 - `npm test` — the `node --test` unit tests (`isExternalUrl`).
 - `npm run setup-vault` — build, then generate the gitignored `test-vault/` from the committed fixtures with the plugin deployed and enabled. Open it in Obsidian to verify hover detection, which has no automated coverage (it needs a live editor).
 - `npm run deploy -- --vault "/path/to/Vault"` — build and copy the plugin into a vault for local testing.

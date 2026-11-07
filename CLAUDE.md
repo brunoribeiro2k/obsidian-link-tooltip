@@ -48,6 +48,9 @@ Goal: prepare this for submission to the **Obsidian community plugins** list.
   `package.json` and `versions.json` (the `npm version` flow does this for you).
 - `versions.json` — maps each plugin version to the `minAppVersion` it requires.
   Written automatically by `version-bump.mjs`.
+- `eslint.config.mjs` — the official `eslint-plugin-obsidianmd` recommended config,
+  plus Node globals and relaxed Obsidian rules for scripts/tests that never run in
+  Obsidian.
 - `esbuild.config.mjs` — bundles `main.ts` → `main.js` (CJS, `obsidian` and
   `@codemirror/*` externalized).
 - `version-bump.mjs` — run by `npm version` (invoked by `npm run release`); writes
@@ -72,7 +75,9 @@ Goal: prepare this for submission to the **Obsidian community plugins** list.
 ## Commands
 
 - `npm run dev` — esbuild watch (inline sourcemaps).
-- `npm run build` — typecheck (`tsc -noEmit -skipLibCheck`) then production bundle.
+- `npm run build` — typecheck (`tsc -noEmit -skipLibCheck`), lint, then production
+  bundle. Lint (`npm run lint`) runs the official `eslint-plugin-obsidianmd`
+  recommended config, i.e. the checks the community review applies.
 - `npm test` — run the `node --test` unit tests (`isExternalUrl`).
 - `npm run setup-vault` — build, then (re)generate the gitignored `test-vault/` from
   `test/fixtures/vault/` with the plugin deployed and enabled. Open it as a vault to
@@ -108,7 +113,8 @@ These reflect Obsidian community-plugin review requirements — keep them holdin
   `createDiv`, `addClass`, …).
 - **Clean teardown.** Every listener/element created must be removed on
   `ViewPlugin.destroy()` / plugin `onunload`.
-- `console.log` only behind the opt-in **Debug logging** setting.
+- Logging only through `plugin.debug()` (`console.debug`, behind the opt-in **Debug
+  logging** setting); the official lint allows only `console.warn/error/debug`.
 - Keep `manifest.json` `description` concise, ending with a period, not starting
   with "This plugin", and not containing the word "Obsidian".
 
