@@ -21,6 +21,9 @@
 	],
 	"author": "Bruno Ribeiro",
 	"license": "MIT",
+	"engines": {
+		"node": ">=22"
+	},
 	"devDependencies": {
 		"@codemirror/language": "^6.11.0",
 		"@codemirror/state": "^6.5.0",
