@@ -18,7 +18,10 @@ Obsidian already shows native browser-style tooltips for real `<a href>` element
 
 - **Show tooltips for external links** — reveal the destination URL of a hovered external link. On by default.
 - **Show tooltips for internal links** — reveal the target of a hovered internal link or aliased wikilink. On by default.
+- **Tooltip delay** — milliseconds to wait after hovering a link before the tooltip appears, from 0 (immediately) to 1000. 300 by default.
 - **Debug logging** — enable only while troubleshooting hover detection.
+
+Every setting shows up in Obsidian's settings search. Requires Obsidian 1.13 or later.
 
 ## Install into a vault
 

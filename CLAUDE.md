@@ -26,7 +26,9 @@ Goal: prepare this for submission to the **Obsidian community plugins** list.
   token's underscore-joined HyperMD style classes (`link`/`url` for Markdown links,
   `hmd-internal-link`/`link-alias` for wikilinks, `*code*` for code that must be
   skipped). It gates the result by the per-kind settings and renders the destination.
-  Also contains the settings tab. Detection is token-driven, not line-based: the
+  Also contains the settings tab, which is declarative (`getSettingDefinitions()`,
+  Obsidian 1.13+, so settings appear in settings search); side effects of a change
+  (rebuilding the hover extension, the debug notice) live in `setControlValue`. Detection is token-driven, not line-based: the
   tokenizer has already resolved code spans/blocks, escapes, and angle-bracket
   destinations, so those cases come for free (see #33).
 - `url.mjs` — dependency-free external-URL scheme allowlist (`isExternalUrl`), used by
