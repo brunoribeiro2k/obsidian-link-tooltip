@@ -68,12 +68,20 @@ Goal: prepare this for submission to the **Obsidian community plugins** list.
   pushes the matching tag, and creates a draft GitHub release with `main.js` /
   `manifest.json` / `styles.css`. Idempotent; reports via job summary + a commit
   comment. `workflow_dispatch` is a manual fallback.
+- `scripts/open-vault.mjs` — local-only (`make open`): registers `test-vault/` in
+  Obsidian's `obsidian.json` (only safe while Obsidian is closed, so it refuses
+  otherwise; needed once) and opens it.
+- `Makefile` — thin wrappers around the npm scripts (`make` lists them). Keep it in
+  sync when adding an npm script.
 - `scripts/deploy.mjs` — local-only: builds and copies `main.js` / `manifest.json`
   / `styles.css` into a vault's plugin folder. Not part of the release flow.
 - `main.js`, `data.json`, `*.map` are gitignored build/runtime artifacts. `main.js`
   ships only as a GitHub release asset, never committed.
 
 ## Commands
+
+Each has a `make` wrapper (`make check`, `make vault`, `make open`,
+`make deploy VAULT=…`, `make release BUMP=…`); run `make` to list them.
 
 - `npm run dev` — esbuild watch (inline sourcemaps).
 - `npm run build` — typecheck (`tsc -noEmit -skipLibCheck`), lint, then production

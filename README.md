@@ -84,7 +84,7 @@ To test a pre-release build with [BRAT](https://github.com/TfTHacker/obsidian42-
 
 ## Development
 
-Install dependencies once with `npm install`, then:
+Install dependencies once with `npm install`, then use the npm scripts below. A `Makefile` wraps them (`make` lists the targets), and adds `make open` to open the generated test vault in Obsidian (the first run registers the vault, which needs Obsidian closed).
 
 - `npm run dev` — esbuild in watch mode (rebuilds `main.js` on change, inline sourcemaps).
 - `npm run build` — the done-gate: typecheck (`tsc`), lint (`eslint`), then the production bundle.
