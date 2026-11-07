@@ -16,7 +16,9 @@
  * name.
  *
  * Refuses to run on a dirty tree so the release commit contains only the bump,
- * and reuses an existing PR/branch instead of erroring if one is already open.
+ * and anywhere but the tip of origin/main, so the release carries exactly what
+ * was merged. Reuses an existing PR/branch instead of erroring if one is
+ * already open.
  */
 import { execSync } from "node:child_process";
 import { readFileSync } from "node:fs";
@@ -38,12 +40,27 @@ if (capture("git status --porcelain")) {
 	process.exit(1);
 }
 
-// 2. Bump the version everywhere (version-bump.mjs syncs manifest.json and
+// 2. Only release what's on main. A release cut from a feature branch drags
+//    its pre-squash commits into the PR, and a stale main misses merged work.
+//    Being exactly at origin/main allows main itself or a fresh release branch.
+run("git fetch --quiet origin main");
+const head = capture("git rev-parse HEAD");
+const mainTip = capture("git rev-parse origin/main");
+if (head !== mainTip) {
+	const where = capture("git rev-parse --abbrev-ref HEAD");
+	console.error(
+		`Releases are cut from the tip of origin/main, but "${where}" is at ${head.slice(0, 7)} ` +
+			`and origin/main is at ${mainTip.slice(0, 7)}.\nRun: git checkout main && git pull --ff-only`,
+	);
+	process.exit(1);
+}
+
+// 3. Bump the version everywhere (version-bump.mjs syncs manifest.json and
 //    versions.json via the `version` lifecycle). No tag — the workflow tags.
 run(`npm version ${bump}`);
 const { version } = JSON.parse(readFileSync("package.json", "utf8"));
 
-// 3. Land the bump on a release branch, carrying the uncommitted changes over.
+// 4. Land the bump on a release branch, carrying the uncommitted changes over.
 //    The branch is release/<version>, but if we're already on a release branch
 //    for this version — including one named with a descriptive suffix like
 //    release/<version>-first-final — keep it rather than switching to the bare
@@ -64,12 +81,12 @@ if (onReleaseBranch) {
 	run(exists ? `git checkout ${branch}` : `git checkout -b ${branch}`);
 }
 
-// 4. Commit and push.
+// 5. Commit and push.
 run("git add -A");
 run(`git commit -m "chore(release): ${version}"`);
 run(`git push -u origin ${branch}`);
 
-// 5. Open the PR, or point at the existing one.
+// 6. Open the PR, or point at the existing one.
 const title = `chore(release): ${version}`;
 let prUrl = "";
 try {

@@ -59,9 +59,10 @@ Goal: prepare this for submission to the **Obsidian community plugins** list.
   community store requires) and `git-tag-version=false` (so `npm version` only
   bumps files; the release workflow owns tags).
 - `scripts/prepare-release.mjs` — local half of the release flow (`npm run
-  release -- <patch|minor|major>`): bumps the version on a clean tree, lands it on
-  a `release/<version>` branch, commits, pushes, and opens a PR to main. Never
-  tags — merging the PR is what releases.
+  release -- <patch|minor|major>`): on a clean tree at the tip of `origin/main`
+  (it refuses anywhere else), bumps the version, lands it on a `release/<version>`
+  branch, commits, pushes, and opens a PR to main. Never tags — merging the PR is
+  what releases.
 - `.github/workflows/release.yml` — runs on pushes to `main`: when
   `manifest.json`'s version has no release yet, builds, attests provenance,
   pushes the matching tag, and creates a draft GitHub release with `main.js` /
@@ -85,12 +86,13 @@ Goal: prepare this for submission to the **Obsidian community plugins** list.
 - `npm run deploy -- --vault "/path/to/Vault"` — build + copy into a vault for
   local testing. Also accepts `--plugin-dir`, or `OBSIDIAN_VAULT` /
   `OBSIDIAN_PLUGIN_DIR` env vars.
-- `npm run release -- <patch|minor|major>` — cut a release. From a clean tree it
-  bumps the version (syncing `manifest.json` + `versions.json` via
+- `npm run release -- <patch|minor|major>` — cut a release. Run it from a clean,
+  up-to-date `main` (or a fresh release branch at the same commit); it refuses
+  anywhere else. It bumps the version (syncing `manifest.json` + `versions.json` via
   `version-bump.mjs`), lands it on a `release/<version>` branch (or keeps the
   current branch if it already matches `release/<version>`, including a manual
-  `-<description>` suffix), commits, pushes,
-  and opens a PR to main. It does **not** tag. Merging the PR triggers
+  `-<description>` suffix), commits, pushes, and opens a PR to main. It does
+  **not** tag. Merging the PR triggers
   `release.yml`, which tags the merged commit (no `v` prefix) and drafts the
   GitHub release. Then review the draft notes and publish.
 
