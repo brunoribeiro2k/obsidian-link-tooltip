@@ -13,7 +13,7 @@ A tooltip should reveal the hidden destination of every Markdown link.
 - [a note link](Some note)
 - [a heading link](Some note#A heading)
 
-## Bare — EXPECT: NO TOOLTIP
+## Bare — EXPECT: NO TOOLTIP (TOOLTIP if "already show" is on)
 
 Bare autolinks already show their destination:
 

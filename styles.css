@@ -20,3 +20,11 @@
 	overflow-wrap: anywhere;
 	white-space: normal;
 }
+
+/* A remark after the destination, e.g. "not created yet" for a missing note. */
+.link-tooltip-note {
+	margin-left: 0.75em;
+	color: var(--text-muted);
+	font-family: var(--font-interface);
+	font-style: italic;
+}

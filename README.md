@@ -2,7 +2,7 @@
 
 Link Tooltip is a lightweight Obsidian plugin that shows where a hovered link points, in Live Preview and source mode.
 
-A tooltip appears for any link that hides its destination behind a label: every Markdown link `[label](destination)` — an external URL or an internal note path — and aliased wikilinks `[[target|alias]]`. Bare links already show their destination as text (a raw URL, or an unaliased `[[Note]]`), so they get no tooltip.
+A tooltip appears for any link that hides its destination behind a label: every Markdown link `[label](destination)` — an external URL or an internal note path — and aliased wikilinks `[[target|alias]]`. Bare links already show their destination as text (a raw URL, or an unaliased `[[Note]]`), so by default they get no tooltip. Optionally, internal links can show the file they point to in the vault (e.g. `Projects/2026/Note.md`), which gives unaliased wikilinks a tooltip too when their folder isn't visible.
 
 Obsidian already shows native browser-style tooltips for real `<a href>` elements in Reading mode, so Reading mode is intentionally out of scope. This plugin targets the editor, where links are rendered by CodeMirror as spans and the destination is not available as an `href` attribute.
 
@@ -10,7 +10,8 @@ Obsidian already shows native browser-style tooltips for real `<a href>` element
 
 - Registers a CodeMirror 6 extension for editor views.
 - Detects hover on rendered Markdown links and wikilinks in Live Preview and source mode.
-- Recovers the hovered link's destination from CodeMirror's syntax tree (shown as its literal target for internal links), not from hidden DOM spans.
+- Recovers the hovered link's destination from CodeMirror's syntax tree, not from hidden DOM spans. Internal links show their target as written, or optionally the vault file it resolves to.
+- Skips tooltips that would only repeat what the link already shows, unless you turn that check off.
 - Shows the destination in a small floating tooltip near the cursor.
 - Persists its settings with Obsidian's `loadData()` / `saveData()` plugin data APIs.
 
@@ -18,6 +19,8 @@ Obsidian already shows native browser-style tooltips for real `<a href>` element
 
 - **Show tooltips for external links** — reveal the destination URL of a hovered external link. On by default.
 - **Show tooltips for internal links** — reveal the target of a hovered internal link or aliased wikilink. On by default.
+- **Show full path for internal links** — show the file each internal link points to in the vault (e.g. `Projects/2026/Note.md#Heading`) instead of the target as written. Also adds tooltips to links without an alias when their path isn't already visible. A link to a note that doesn't exist shows its target with "not created yet". Off by default; shown while internal tooltips are on.
+- **Show tooltips for links that already show their destination** — also show the tooltip when it would only repeat what the link shows: raw URLs, links without an alias, and links whose label matches their destination. Off by default.
 - **Tooltip delay** — milliseconds to wait after hovering a link before the tooltip appears, from 0 (immediately) to 1000. 300 by default.
 - **Debug logging** — enable only while troubleshooting hover detection.
 
@@ -92,7 +95,7 @@ Install dependencies once with `npm install`, then use the npm scripts below. A 
 - `npm run dev` — esbuild in watch mode (rebuilds `main.js` on change, inline sourcemaps).
 - `npm run build` — the done-gate: typecheck (`tsc`), lint (`eslint`), then the production bundle.
 - `npm run lint` — ESLint on its own, with the official `eslint-plugin-obsidianmd` rules the community review applies.
-- `npm test` — the `node --test` unit tests (`isExternalUrl`).
+- `npm test` — the `node --test` unit tests (`isExternalUrl`, `repeatsVisibleText`).
 - `npm run setup-vault` — build, then generate the gitignored `test-vault/` from the committed fixtures with the plugin deployed and enabled. Open it in Obsidian to verify hover detection, which has no automated coverage (it needs a live editor).
 - `npm run deploy -- --vault "/path/to/Vault"` — build and copy the plugin into a vault for local testing.
 

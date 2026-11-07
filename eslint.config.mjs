@@ -22,6 +22,9 @@ export default defineConfig([
 						"scripts/*.mjs",
 						"test/*.mjs",
 					],
+					// The scripts and tests above are a handful of small files, so
+					// the default project's 8-file guard is safe to raise.
+					maximumDefaultProjectFileMatchCount_THIS_WILL_SLOW_DOWN_LINTING: 16,
 				},
 				tsconfigRootDir: import.meta.dirname,
 			},
