@@ -3,9 +3,7 @@ import {
 	Notice,
 	Plugin,
 	PluginSettingTab,
-	Setting,
-	SliderComponent,
-	TextComponent,
+	type SettingDefinitionItem,
 } from "obsidian";
 import { EditorView, hoverTooltip } from "@codemirror/view";
 import { Extension } from "@codemirror/state";
@@ -66,10 +64,13 @@ export default class LinkTooltipPlugin extends Plugin {
 			return;
 		}
 
-		console.log(`[link-tooltip] ${message}`, ...data);
+		console.debug(`[link-tooltip] ${message}`, ...data);
 	}
 }
 
+// Declarative settings tab (Obsidian 1.13+), so every setting shows up in
+// Obsidian's settings search. The base class reads and writes
+// `this.plugin.settings` by each control's key and persists it.
 class LinkTooltipSettingTab extends PluginSettingTab {
 	constructor(
 		app: App,
@@ -78,108 +79,51 @@ class LinkTooltipSettingTab extends PluginSettingTab {
 		super(app, plugin);
 	}
 
-	display(): void {
-		const { containerEl } = this;
-		containerEl.empty();
+	getSettingDefinitions(): SettingDefinitionItem[] {
+		const definitions: SettingDefinitionItem<keyof LinkTooltipSettings>[] = [
+			{
+				name: "Show tooltips for external links",
+				desc: "Reveal the destination URL of a hovered external link.",
+				control: { type: "toggle", key: "externalLinks" },
+			},
+			{
+				name: "Show tooltips for internal links",
+				desc: "Reveal the target of a hovered internal link or aliased wikilink.",
+				control: { type: "toggle", key: "internalLinks" },
+			},
+			{
+				name: "Tooltip delay",
+				desc: "Milliseconds to wait after hovering a link before the tooltip appears. Set to 0 to show it immediately.",
+				aliases: ["hover delay"],
+				control: {
+					type: "slider",
+					key: "hoverDelay",
+					min: 0,
+					max: 1000,
+					step: 50,
+					displayFormat: (value) => `${value} ms`,
+				},
+			},
+			{
+				name: "Debug logging",
+				desc: "Log hover diagnostics to the developer console.",
+				control: { type: "toggle", key: "debugLogging" },
+			},
+		];
+		return definitions;
+	}
 
-		new Setting(containerEl)
-			.setName("Show tooltips for external links")
-			.setDesc("Reveal the destination URL of a hovered external link.")
-			.addToggle((toggle) => {
-				toggle
-					.setValue(this.plugin.settings.externalLinks)
-					.onChange(async (value) => {
-						this.plugin.settings.externalLinks = value;
-						await this.plugin.saveSettings();
-					});
-			});
+	async setControlValue(key: string, value: unknown): Promise<void> {
+		await super.setControlValue(key, value);
 
-		new Setting(containerEl)
-			.setName("Show tooltips for internal links")
-			.setDesc(
-				"Reveal the target of a hovered internal link or aliased wikilink.",
-			)
-			.addToggle((toggle) => {
-				toggle
-					.setValue(this.plugin.settings.internalLinks)
-					.onChange(async (value) => {
-						this.plugin.settings.internalLinks = value;
-						await this.plugin.saveSettings();
-					});
-			});
-
-		// Slider and number box are two views of the same value; each updates the
-		// other without re-firing onChange (Obsidian's setValue doesn't dispatch
-		// an input event), so there's no feedback loop.
-		let slider: SliderComponent;
-		let text: TextComponent;
-
-		const applyDelay = async (value: number) => {
-			this.plugin.settings.hoverDelay = value;
-			await this.plugin.saveSettings();
+		if (key === "hoverDelay") {
+			// The delay is baked into the hover extension; rebuild it live.
 			this.plugin.reconfigureEditorExtension();
-		};
-
-		new Setting(containerEl)
-			.setName("Tooltip delay")
-			.setDesc(
-				"Milliseconds to wait after hovering a link before the tooltip appears. Set to 0 to show it immediately.",
-			)
-			.addSlider((component) => {
-				slider = component;
-				// `setInstant` (Obsidian 1.6.6+, our minAppVersion) makes onChange
-				// fire while dragging rather than only on release.
-				component
-					.setInstant(true)
-					.setLimits(0, 1000, 50)
-					.setValue(this.plugin.settings.hoverDelay)
-					.onChange(async (value) => {
-						text.setValue(String(value));
-						await applyDelay(value);
-					});
-			})
-			.addText((component) => {
-				text = component;
-				component.inputEl.type = "number";
-				component.inputEl.min = "0";
-				component.inputEl.max = "1000";
-				component.inputEl.step = "50";
-				component
-					.setValue(String(this.plugin.settings.hoverDelay))
-					.onChange(async (raw) => {
-						if (raw.trim() === "") {
-							return;
-						}
-
-						const parsed = Number(raw);
-						if (Number.isNaN(parsed)) {
-							return;
-						}
-
-						const value = Math.min(1000, Math.max(0, Math.round(parsed)));
-						slider.setValue(value);
-						if (String(value) !== raw) {
-							component.setValue(String(value));
-						}
-						await applyDelay(value);
-					});
-			});
-
-		new Setting(containerEl)
-			.setName("Debug logging")
-			.setDesc("Log hover diagnostics to the developer console.")
-			.addToggle((toggle) => {
-				toggle
-					.setValue(this.plugin.settings.debugLogging)
-					.onChange(async (value) => {
-						this.plugin.settings.debugLogging = value;
-						if (value) {
-							new Notice("Link Tooltip debug logging enabled");
-						}
-						this.plugin.debug("debug logging enabled");
-						await this.plugin.saveSettings();
-					});
-			});
+		}
+		if (key === "debugLogging" && value === true) {
+			new Notice("Debug logging enabled. Hover diagnostics go to the developer console.");
+			this.plugin.debug("debug logging enabled");
+		}
 	}
 }
 
@@ -206,12 +150,15 @@ function createLinkTooltipExtension(plugin: LinkTooltipPlugin) {
 				pos: link.from,
 				end: link.to,
 				create() {
-					// Build in the view's own document so the element is valid in
+					// Build with the view's own window so the element is valid in
 					// a detached pop-out window; CodeMirror appends it into that
-					// window's tooltip layer.
-					const dom = view.dom.ownerDocument.createElement("div");
-					dom.addClass("link-tooltip-content");
-					dom.setText(link.url);
+					// window's tooltip layer. Obsidian installs its DOM helpers on
+					// every window but only types them as globals, hence the cast.
+					const win = view.dom.ownerDocument.win as typeof window;
+					const dom = win.createDiv({
+						cls: "link-tooltip-content",
+						text: link.url,
+					});
 					return {
 						dom,
 						mount() {

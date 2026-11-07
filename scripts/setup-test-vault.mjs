@@ -50,4 +50,4 @@ await writeFile(
 );
 
 console.log(`Test vault ready at ${vaultDir}`);
-console.log("Open it in Obsidian (Open folder as vault) to experiment visually.");
+console.log("Open it in Obsidian with `make open` (or Open folder as vault) to experiment visually.");

@@ -26,7 +26,9 @@ Goal: prepare this for submission to the **Obsidian community plugins** list.
   token's underscore-joined HyperMD style classes (`link`/`url` for Markdown links,
   `hmd-internal-link`/`link-alias` for wikilinks, `*code*` for code that must be
   skipped). It gates the result by the per-kind settings and renders the destination.
-  Also contains the settings tab. Detection is token-driven, not line-based: the
+  Also contains the settings tab, which is declarative (`getSettingDefinitions()`,
+  Obsidian 1.13+, so settings appear in settings search); side effects of a change
+  (rebuilding the hover extension, the debug notice) live in `setControlValue`. Detection is token-driven, not line-based: the
   tokenizer has already resolved code spans/blocks, escapes, and angle-bracket
   destinations, so those cases come for free (see #33).
 - `url.mjs` — dependency-free external-URL scheme allowlist (`isExternalUrl`), used by
@@ -48,6 +50,9 @@ Goal: prepare this for submission to the **Obsidian community plugins** list.
   `package.json` and `versions.json` (the `npm version` flow does this for you).
 - `versions.json` — maps each plugin version to the `minAppVersion` it requires.
   Written automatically by `version-bump.mjs`.
+- `eslint.config.mjs` — the official `eslint-plugin-obsidianmd` recommended config,
+  plus Node globals and relaxed Obsidian rules for scripts/tests that never run in
+  Obsidian.
 - `esbuild.config.mjs` — bundles `main.ts` → `main.js` (CJS, `obsidian` and
   `@codemirror/*` externalized).
 - `version-bump.mjs` — run by `npm version` (invoked by `npm run release`); writes
@@ -56,14 +61,20 @@ Goal: prepare this for submission to the **Obsidian community plugins** list.
   community store requires) and `git-tag-version=false` (so `npm version` only
   bumps files; the release workflow owns tags).
 - `scripts/prepare-release.mjs` — local half of the release flow (`npm run
-  release -- <patch|minor|major>`): bumps the version on a clean tree, lands it on
-  a `release/<version>` branch, commits, pushes, and opens a PR to master. Never
-  tags — merging the PR is what releases.
-- `.github/workflows/release.yml` — runs on pushes to `master`: when
+  release -- <patch|minor|major>`): on a clean tree at the tip of `origin/main`
+  (it refuses anywhere else), bumps the version, lands it on a `release/<version>`
+  branch, commits, pushes, and opens a PR to main. Never tags — merging the PR is
+  what releases.
+- `.github/workflows/release.yml` — runs on pushes to `main`: when
   `manifest.json`'s version has no release yet, builds, attests provenance,
   pushes the matching tag, and creates a draft GitHub release with `main.js` /
   `manifest.json` / `styles.css`. Idempotent; reports via job summary + a commit
   comment. `workflow_dispatch` is a manual fallback.
+- `scripts/open-vault.mjs` — local-only (`make open`): registers `test-vault/` in
+  Obsidian's `obsidian.json` (only safe while Obsidian is closed, so it refuses
+  otherwise; needed once) and opens it.
+- `Makefile` — thin wrappers around the npm scripts (`make` lists them). Keep it in
+  sync when adding an npm script.
 - `scripts/deploy.mjs` — local-only: builds and copies `main.js` / `manifest.json`
   / `styles.css` into a vault's plugin folder. Not part of the release flow.
 - `main.js`, `data.json`, `*.map` are gitignored build/runtime artifacts. `main.js`
@@ -71,8 +82,13 @@ Goal: prepare this for submission to the **Obsidian community plugins** list.
 
 ## Commands
 
+Each has a `make` wrapper (`make check`, `make vault`, `make open`,
+`make deploy VAULT=…`, `make release BUMP=…`); run `make` to list them.
+
 - `npm run dev` — esbuild watch (inline sourcemaps).
-- `npm run build` — typecheck (`tsc -noEmit -skipLibCheck`) then production bundle.
+- `npm run build` — typecheck (`tsc -noEmit -skipLibCheck`), lint, then production
+  bundle. Lint (`npm run lint`) runs the official `eslint-plugin-obsidianmd`
+  recommended config, i.e. the checks the community review applies.
 - `npm test` — run the `node --test` unit tests (`isExternalUrl`).
 - `npm run setup-vault` — build, then (re)generate the gitignored `test-vault/` from
   `test/fixtures/vault/` with the plugin deployed and enabled. Open it as a vault to
@@ -80,12 +96,13 @@ Goal: prepare this for submission to the **Obsidian community plugins** list.
 - `npm run deploy -- --vault "/path/to/Vault"` — build + copy into a vault for
   local testing. Also accepts `--plugin-dir`, or `OBSIDIAN_VAULT` /
   `OBSIDIAN_PLUGIN_DIR` env vars.
-- `npm run release -- <patch|minor|major>` — cut a release. From a clean tree it
-  bumps the version (syncing `manifest.json` + `versions.json` via
+- `npm run release -- <patch|minor|major>` — cut a release. Run it from a clean,
+  up-to-date `main` (or a fresh release branch at the same commit); it refuses
+  anywhere else. It bumps the version (syncing `manifest.json` + `versions.json` via
   `version-bump.mjs`), lands it on a `release/<version>` branch (or keeps the
   current branch if it already matches `release/<version>`, including a manual
-  `-<description>` suffix), commits, pushes,
-  and opens a PR to master. It does **not** tag. Merging the PR triggers
+  `-<description>` suffix), commits, pushes, and opens a PR to main. It does
+  **not** tag. Merging the PR triggers
   `release.yml`, which tags the merged commit (no `v` prefix) and drafts the
   GitHub release. Then review the draft notes and publish.
 
@@ -108,7 +125,8 @@ These reflect Obsidian community-plugin review requirements — keep them holdin
   `createDiv`, `addClass`, …).
 - **Clean teardown.** Every listener/element created must be removed on
   `ViewPlugin.destroy()` / plugin `onunload`.
-- `console.log` only behind the opt-in **Debug logging** setting.
+- Logging only through `plugin.debug()` (`console.debug`, behind the opt-in **Debug
+  logging** setting); the official lint allows only `console.warn/error/debug`.
 - Keep `manifest.json` `description` concise, ending with a period, not starting
   with "This plugin", and not containing the word "Obsidian".
 

@@ -18,7 +18,10 @@ Obsidian already shows native browser-style tooltips for real `<a href>` element
 
 - **Show tooltips for external links** — reveal the destination URL of a hovered external link. On by default.
 - **Show tooltips for internal links** — reveal the target of a hovered internal link or aliased wikilink. On by default.
+- **Tooltip delay** — milliseconds to wait after hovering a link before the tooltip appears, from 0 (immediately) to 1000. 300 by default.
 - **Debug logging** — enable only while troubleshooting hover detection.
+
+Every setting shows up in Obsidian's settings search. Requires Obsidian 1.13 or later.
 
 ## Install into a vault
 
@@ -48,9 +51,9 @@ If the plugin enabled but hover display is not working:
 1. Open **Settings -> Community plugins -> Link Tooltip**.
 2. Enable **Debug logging**.
 3. Hover a Markdown link or aliased wikilink in Live Preview or source mode.
-4. Filter the console for `link-tooltip`.
+4. Filter the console for `link-tooltip`, with the log level set to include **Verbose**.
 
-When debug logging is enabled, Obsidian should show a small notice and the console should show normal `console.log` entries prefixed with `[link-tooltip]`.
+When debug logging is enabled, Obsidian should show a small notice and the console should show `console.debug` entries prefixed with `[link-tooltip]`. Chromium hides debug entries at the default log level, so pick **Verbose** in the console's level dropdown.
 
 The hover diagnostics include the hovered position and the parsed link (its range, destination, kind, and whether it is aliased).
 
@@ -84,24 +87,24 @@ To test a pre-release build with [BRAT](https://github.com/TfTHacker/obsidian42-
 
 ## Development
 
-Install dependencies once with `npm install`, then:
+Install dependencies once with `npm install`, then use the npm scripts below. A `Makefile` wraps them (`make` lists the targets), and adds `make open` to open the generated test vault in Obsidian (the first run registers the vault, which needs Obsidian closed).
 
 - `npm run dev` — esbuild in watch mode (rebuilds `main.js` on change, inline sourcemaps).
 - `npm run build` — the done-gate: typecheck (`tsc`), lint (`eslint`), then the production bundle.
-- `npm run lint` — ESLint on its own.
+- `npm run lint` — ESLint on its own, with the official `eslint-plugin-obsidianmd` rules the community review applies.
 - `npm test` — the `node --test` unit tests (`isExternalUrl`).
 - `npm run setup-vault` — build, then generate the gitignored `test-vault/` from the committed fixtures with the plugin deployed and enabled. Open it in Obsidian to verify hover detection, which has no automated coverage (it needs a live editor).
 - `npm run deploy -- --vault "/path/to/Vault"` — build and copy the plugin into a vault for local testing.
 
-Work on a feature branch (or directly on a release branch) and open PRs against `master`. CI runs lint, build, and tests on every pull request.
+Work on a feature branch (or directly on a release branch) and open PRs against `main`. CI runs lint, build, and tests on every pull request.
 
 ## Releasing
 
 Releases are PR-driven, and tagging plus the GitHub release draft are automated — you only prepare the version bump.
 
-1. From a clean working tree, run `npm run release -- <patch|minor|major>`. This bumps the version (`manifest.json`, `package.json`, `versions.json`) **without** creating a git tag, lands it on a `release/<version>` branch, commits, pushes, and opens a PR to `master`. If you've already created a release branch for this version with a descriptive suffix (e.g. `release/1.0.0-first-final`), run the command from that branch and it's kept as-is rather than switched to the bare `release/<version>`.
-2. Review and merge the PR into `master`.
+1. From a clean, up-to-date `main` (`git checkout main && git pull --ff-only`), run `npm run release -- <patch|minor|major>`. It refuses to run anywhere but the tip of `origin/main`, so the release carries exactly what was merged. This bumps the version (`manifest.json`, `package.json`, `versions.json`) **without** creating a git tag, lands it on a `release/<version>` branch, commits, pushes, and opens a PR to `main`. If you've already created a release branch for this version with a descriptive suffix (e.g. `release/1.0.0-first-final`) at that same commit, run the command from that branch and it's kept as-is rather than switched to the bare `release/<version>`.
+2. Review and merge the PR into `main`.
 3. On that merge, the release workflow detects the new version, builds, attests build provenance, pushes the matching tag (no `v` prefix), and creates a **draft** GitHub release with `main.js`, `manifest.json`, and `styles.css` attached. It links the draft from a comment on the merge commit and from the workflow run summary.
 4. Review the draft's notes and publish it. Publishing makes the assets downloadable; the Obsidian community directory picks up the new version on its next review.
 
-The workflow is the sole creator of git tags (so a tag always points at the merged `master` commit), which is why `npm version` is configured never to tag here (`git-tag-version=false` in `.npmrc`).
+The workflow is the sole creator of git tags (so a tag always points at the merged `main` commit), which is why `npm version` is configured never to tag here (`git-tag-version=false` in `.npmrc`).

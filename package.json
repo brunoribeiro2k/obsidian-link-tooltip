@@ -21,15 +21,19 @@
 	],
 	"author": "Bruno Ribeiro",
 	"license": "MIT",
+	"engines": {
+		"node": ">=22"
+	},
 	"devDependencies": {
 		"@codemirror/language": "^6.11.0",
-		"@codemirror/state": "^6.5.0",
-		"@codemirror/view": "^6.36.8",
-		"@eslint/js": "^10.0.1",
+		"@codemirror/state": "6.5.0",
+		"@codemirror/view": "6.38.6",
+		"@eslint/js": "^9.39.5",
 		"esbuild": "^0.25.0",
-		"eslint": "^10.5.0",
+		"eslint": "^9.39.5",
+		"eslint-plugin-obsidianmd": "^0.4.2",
 		"globals": "^17.7.0",
-		"obsidian": "^1.8.7",
+		"obsidian": "1.13.1",
 		"typescript": "^5.8.2",
 		"typescript-eslint": "^8.62.0"
 	}
